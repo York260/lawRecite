@@ -158,7 +158,7 @@
     savePrefs();
     syncControls();
     paint();
-    window.scrollTo({ top: 0 });
+    scrollToSheet();
     if (!order.length) finish();
   }
 
@@ -276,6 +276,16 @@
       fillArticleSelect();
     }
     setTimeout(function () { reveal($('result')); }, 30);
+  }
+
+  // 換條或重來時，把條文卡片頂端捲到畫面上方（手機上不用再往下滑）
+  var firstRender = true;
+  function scrollToSheet() {
+    if (firstRender) { firstRender = false; window.scrollTo(0, 0); return; }
+    var top = document.querySelector('.top');
+    var sticky = getComputedStyle(top).position === 'sticky' ? top.offsetHeight : 0;
+    var y = $('sheet').getBoundingClientRect().top + window.pageYOffset - sticky - 8;
+    window.scrollTo(0, Math.max(0, y));
   }
 
   function goTo(i) {
@@ -556,6 +566,8 @@
     $('kb-done').hidden = !done;
     $('kb-keys').hidden = done || voice;
     $('kb-voice').hidden = done || !voice;
+    // 鍵盤區已有完成按鈕時，卡片內就不重複顯示
+    $('result-actions').hidden = !$('kb').hidden;
     updateKbHeight();
   }
 
