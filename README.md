@@ -33,6 +33,9 @@
 
 ## 使用
 
+線上版（GitHub Pages）：https://york260.github.io/lawRecite/
+
+
 直接用瀏覽器開啟 `index.html` 即可，不需要伺服器。
 想傳到手機離線使用，可以產生單一檔案：
 
