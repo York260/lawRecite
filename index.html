@@ -35,15 +35,20 @@
 
 <main class="wrap">
   <div class="tools">
-    <div class="density" id="density" role="radiogroup" aria-label="挖空程度">
+    <div class="seg" id="input-seg" role="radiogroup" aria-label="輸入方式">
+      <span class="tool-label">輸入</span>
+      <button type="button" data-in="zhuyin" role="radio">注音</button>
+      <button type="button" data-in="voice" role="radio">語音</button>
+    </div>
+    <div class="seg" id="density" role="radiogroup" aria-label="挖空程度">
       <span class="tool-label">挖空</span>
       <button type="button" data-d="1" role="radio">少 <small></small></button>
       <button type="button" data-d="2" role="radio">中 <small></small></button>
       <button type="button" data-d="3" role="radio">多 <small></small></button>
     </div>
     <label class="check" id="punct-wrap"><input type="checkbox" id="opt-punct"> 先顯示標點</label>
-    <label class="check"><input type="checkbox" id="opt-retry"> 打錯要重打</label>
-    <label class="check kb-toggle"><input type="checkbox" id="opt-kb"> 螢幕鍵盤</label>
+    <label class="check" id="retry-wrap"><input type="checkbox" id="opt-retry"> 打錯要重打</label>
+    <label class="check kb-toggle" id="kb-wrap"><input type="checkbox" id="opt-kb"> 螢幕鍵盤</label>
     <button type="button" id="restart" class="ghost-btn">重來</button>
   </div>
 
@@ -72,6 +77,7 @@
   <p class="howto" id="howto">
     每個字只要打<b>第一個注音</b>就會出現；打錯會標成紅底。電腦可直接用大千注音鍵位（1=ㄅ、q=ㄆ、a=ㄇ…），
     <kbd>Backspace</kbd> 退回一字、<kbd>空白鍵</kbd> 提示、<kbd>Enter</kbd> 完成後下一條。
+    選「語音」則直接把條文唸出來，唸對的字會出現，同音字也算對；唸錯或漏唸的字標紅底，背完說「下一條」即可換條。
   </p>
 </main>
 
@@ -81,9 +87,21 @@
     <button type="button" id="kb-next" class="primary-btn">下一條 →</button>
   </div>
   <div class="kb-keys" id="kb-keys"></div>
+  <div class="kb-voice" id="kb-voice" hidden>
+    <div class="v-heard" id="v-heard" aria-live="polite"></div>
+    <div class="v-row">
+      <button type="button" class="ghost-btn v-side" id="v-hint">提示</button>
+      <button type="button" class="mic" id="v-mic" aria-pressed="false">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 15a3.5 3.5 0 0 0 3.5-3.5v-6a3.5 3.5 0 1 0-7 0v6A3.5 3.5 0 0 0 12 15Zm6-3.5a1 1 0 1 0-2 0 4 4 0 0 1-8 0 1 1 0 1 0-2 0 6 6 0 0 0 5 5.91V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.59a6 6 0 0 0 5-5.91Z"/></svg>
+        <span id="v-label">開始唸</span>
+      </button>
+      <button type="button" class="ghost-btn v-side" id="v-back" aria-label="退回一字">⌫</button>
+    </div>
+  </div>
 </div>
 
 <script src="data/laws.js"></script>
+<script src="data/sounds.js"></script>
 <script src="assets/app.js"></script>
 <!--/APP-->
 </body>

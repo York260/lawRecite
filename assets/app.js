@@ -47,6 +47,7 @@
     density: 2,
     showPunct: true,
     retry: false,
+    input: 'zhuyin',
     kb: coarse,
     art: {}
   }, store.prefs);
@@ -65,7 +66,8 @@
   artIdx = artIndexById(prefs.art[law.id]);
 
   function progressKey(art) {
-    return law.id + ':' + prefs.mode + (prefs.mode === 'cloze' ? prefs.density : '') + ':' + art.id;
+    return law.id + ':' + prefs.mode + (prefs.mode === 'cloze' ? prefs.density : '') +
+      (prefs.input === 'voice' ? 'v' : '') + ':' + art.id;
   }
 
   function isTypeable(z, k, mode, density) {
@@ -94,7 +96,7 @@
     var body = $('body');
     body.textContent = '';
     body.className = 'body ' + prefs.mode;
-    var cells = [], order = [], typedBefore = 0;
+    var cells = [], order = [], han = [], typedBefore = 0;
 
     art.lines.forEach(function (line) {
       var row = document.createElement('div');
@@ -114,6 +116,7 @@
         var typeable = isTypeable(zs[i], line.k[i], prefs.mode, prefs.density);
         var cell = { idx: cells.length, ch: ch, z: zs[i], typeable: typeable, punct: !zs[i], el: el, st: null, before: typedBefore };
         if (typeable) { cell.oi = order.length; order.push(cells.length); typedBefore++; }
+        if (!cell.punct) { cell.hi = han.length; han.push(cells.length); }
         cells.push(cell);
         text.appendChild(el);
       }
@@ -121,13 +124,13 @@
       body.appendChild(row);
     });
 
-    S = { art: art, cells: cells, order: order, pos: 0, done: false, missed: false };
+    S = { art: art, cells: cells, order: order, han: han, pos: 0, done: false, missed: false };
+    voiceFlush(false);
+    showHeard('');
     $('chapter').textContent = art.chapter;
     $('art-title').textContent = '第 ' + art.id + ' 條';
     $('m-total').textContent = order.length;
     $('result').hidden = true;
-    $('kb-done').hidden = true;
-    $('kb-keys').hidden = false;
 
     prefs.art[law.id] = art.id;
     savePrefs();
@@ -175,6 +178,7 @@
   // ---------- 輸入 ----------
   function input(sym) {
     if (!S || S.done) return;
+    voiceFlush(false);
     var cell = S.cells[S.order[S.pos]];
     if (cell.z.indexOf(sym) !== -1) {
       cell.st = S.missed ? 'bad' : 'ok';
@@ -193,6 +197,7 @@
 
   function hint() {
     if (!S || S.done) return;
+    voiceFlush(false);
     S.cells[S.order[S.pos]].st = 'hint';
     advance();
   }
@@ -207,9 +212,10 @@
 
   function back() {
     if (!S) return;
+    voiceFlush(false);
     if (S.missed) { S.missed = false; paint(); return; }
     if (S.pos === 0) return;
-    if (S.done) { S.done = false; $('result').hidden = true; $('kb-done').hidden = true; $('kb-keys').hidden = false; }
+    if (S.done) { S.done = false; $('result').hidden = true; syncPanels(); }
     S.pos--;
     S.cells[S.order[S.pos]].st = null;
     paint();
@@ -228,13 +234,12 @@
     var pct = total ? Math.round(ok / total * 100) : 100;
     $('r-pct').textContent = pct + '%';
     $('r-text').textContent = total
-      ? '共 ' + total + ' 字，答對 ' + ok + '、打錯 ' + bad + '、提示 ' + hintN
+      ? '共 ' + total + ' 字，答對 ' + ok + '、' + (prefs.input === 'voice' ? '唸錯／漏唸 ' : '打錯 ') + bad + '、提示 ' + hintN
       : '這一條在目前的挖空程度沒有空格';
     var last = artIdx === law.articles.length - 1;
     $('r-next').textContent = $('kb-next').textContent = last ? '回到第 ' + law.articles[0].id + ' 條' : '下一條 →';
     $('result').hidden = false;
-    $('kb-done').hidden = false;
-    $('kb-keys').hidden = true;
+    syncPanels();
 
     if (total) {
       var key = progressKey(S.art);
@@ -264,7 +269,7 @@
     return { top: top, bottom: bottom };
   }
   function keepInView() {
-    if (!S || S.done) return;
+    if (!S || S.done || S.pos >= S.order.length) return;
     var el = S.cells[S.order[S.pos]].el;
     var r = el.getBoundingClientRect(), band = visibleBand();
     if (r.top < band.top || r.bottom > band.bottom) {
@@ -275,6 +280,194 @@
   function reveal(el) {
     var r = el.getBoundingClientRect(), band = visibleBand();
     if (r.bottom > band.bottom) window.scrollBy({ top: r.bottom - band.bottom + 8, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+
+
+  // ---------- 語音輸入 ----------
+  // 把唸出來的句子和條文對齊：同字或同音（不分聲調）算對，唸成別的字或漏唸算錯。
+  var Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var SOUND = {};
+  (window.LAW_SOUNDS || '').split('|').forEach(function (group) {
+    var p = group.split(':');
+    if (p.length < 2) return;
+    for (var i = 0; i < p[1].length; i++) (SOUND[p[1][i]] = SOUND[p[1][i]] || []).push(p[0]);
+  });
+  function sameSound(a, b) {
+    if (a === b) return true;
+    var sa = SOUND[a], sb = SOUND[b];
+    if (!sa || !sb) return false;
+    for (var i = 0; i < sa.length; i++) if (sb.indexOf(sa[i]) !== -1) return true;
+    return false;
+  }
+
+  // 辨識結果常用阿拉伯數字（第28條、40歲），換成條文的寫法（二十八、四十）
+  var DIGITS = '零一二三四五六七八九';
+  function intToHan(str) {
+    if (str.length > 4) return str.split('').map(function (d) { return DIGITS[+d]; }).join('');
+    var n = +str, units = ['', '十', '百', '千'], out = '', zero = false;
+    if (n === 0) return '零';
+    var ds = String(n).split('');
+    ds.forEach(function (d, i) {
+      d = +d;
+      var u = units[ds.length - 1 - i];
+      if (d === 0) { zero = true; return; }
+      if (zero) out += '零';
+      zero = false;
+      out += (d === 1 && u === '十' ? '' : DIGITS[d]) + u;
+    });
+    return out;
+  }
+  function numToHan(num) {
+    var p = num.split('.');
+    return intToHan(p[0]) + (p[1] ? '點' + p[1].split('').map(function (d) { return DIGITS[+d]; }).join('') : '');
+  }
+  function normalizeSpeech(text) {
+    text = text.replace(/(\d+(?:\.\d+)?)\s*%/g, function (m, n) { return '百分之' + numToHan(n); });
+    text = text.replace(/\d+(?:\.\d+)?/g, numToHan);
+    return text.replace(/[^㐀-鿿]/g, '');
+  }
+
+  var V = { rec: null, on: false, base: null, prevPos: 0, touched: [], committed: 0, seen: 0 };
+
+  function delCost(cell) { return cell.typeable ? 1 : 0.3; }
+
+  // 回傳條文從 base 起被唸到的範圍，每個字標 1 = 唸對、0 = 唸錯或漏唸
+  function align(spoken, base) {
+    var F = [];
+    for (var h = base; h < S.han.length && F.length < spoken.length * 2 + 12; h++) F.push(S.cells[S.han[h]]);
+    var n = spoken.length, m = F.length, W = m + 1;
+    var sc = new Float32Array((n + 1) * W), op = new Uint8Array((n + 1) * W);
+    var i, j;
+    for (i = 1; i <= n; i++) { sc[i * W] = 0; op[i * W] = 2; } // 句首多唸的字不扣分（例如從句子開頭重唸）
+    for (j = 1; j <= m; j++) { sc[j] = sc[j - 1] - delCost(F[j - 1]); op[j] = 3; }
+    for (i = 1; i <= n; i++) {
+      for (j = 1; j <= m; j++) {
+        var diag = sc[(i - 1) * W + j - 1] + (sameSound(spoken[i - 1], F[j - 1].ch) ? 2 : -1);
+        var up = sc[(i - 1) * W + j] - 1;
+        var left = sc[i * W + j - 1] - delCost(F[j - 1]);
+        var best = diag, o = 1;
+        if (up >= best) { best = up; o = 2; }
+        if (left > best) { best = left; o = 3; }
+        sc[i * W + j] = best;
+        op[i * W + j] = o;
+      }
+    }
+    var end = 0;
+    for (j = 1; j <= m; j++) if (sc[n * W + j] > sc[n * W + end]) end = j;
+    var marks = new Array(end);
+    i = n; j = end;
+    while (i > 0 && j > 0) {
+      var o2 = op[i * W + j];
+      if (o2 === 1) { marks[j - 1] = sameSound(spoken[i - 1], F[j - 1].ch) ? 1 : 0; i--; j--; }
+      else if (o2 === 2) i--;
+      else { marks[j - 1] = 0; j--; }
+    }
+    for (; j > 0; j--) marks[j - 1] = 0;
+    return { cells: F.slice(0, end), marks: marks };
+  }
+
+  function applySpeech(text) {
+    if (V.base === null) {
+      if (S.pos >= S.order.length) return;
+      V.base = S.cells[S.order[S.pos]].hi;
+      V.prevPos = S.pos;
+    }
+    V.touched.forEach(function (t) { t.cell.st = t.st; });
+    V.touched = [];
+    S.pos = V.prevPos;
+    var spoken = normalizeSpeech(text);
+    if (spoken) {
+      var r = align(spoken, V.base);
+      r.cells.forEach(function (cell, k) {
+        if (!cell.typeable || cell.st) return;
+        V.touched.push({ cell: cell, st: cell.st });
+        cell.st = r.marks[k] ? 'ok' : 'bad';
+        S.pos++;
+      });
+    }
+    paint();
+    keepInView();
+  }
+
+  // 把暫定的辨識結果定案
+  function voiceFlush(checkFinish) {
+    V.touched = [];
+    V.base = null;
+    V.committed = V.seen;
+    if (checkFinish && S && !S.done && S.pos >= S.order.length) finish();
+  }
+
+  function onSpeech(e) {
+    if (e.results.length < V.committed) V.committed = 0;
+    V.seen = e.results.length;
+    var text = '', allFinal = true;
+    for (var i = V.committed; i < e.results.length; i++) {
+      text += e.results[i][0].transcript;
+      if (!e.results[i].isFinal) allFinal = false;
+    }
+    showHeard(text);
+    if (!S) return;
+    if (S.done) {
+      if (/下一[條条]/.test(text)) { V.committed = V.seen; goTo(artIdx + 1); }
+      else if (allFinal) V.committed = V.seen;
+      return;
+    }
+    applySpeech(text);
+    if (allFinal) voiceFlush(true);
+  }
+
+  function showHeard(text, isError) {
+    var el = $('v-heard');
+    el.classList.toggle('err', !!isError);
+    el.textContent = text || (V.on ? '請開始唸…' : '按麥克風，把條文唸出來；唸錯的字會標紅底');
+  }
+
+  function voiceStart() {
+    if (!Recognition) {
+      showHeard('這個瀏覽器不支援語音辨識，請改用 Chrome、Edge，或 iPhone／Mac 的 Safari。', true);
+      return;
+    }
+    var rec = new Recognition();
+    rec.lang = 'zh-TW';
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.onresult = onSpeech;
+    rec.onerror = function (e) {
+      if (e.error === 'no-speech' || e.error === 'aborted') return;
+      V.on = false;
+      var msg = e.error === 'not-allowed' || e.error === 'service-not-allowed'
+        ? '無法使用麥克風。請允許這個網頁使用麥克風；若是在 claude.ai 裡開啟，請改用瀏覽器直接開網頁。'
+        : e.error === 'network' ? '語音辨識需要網路連線。' : '語音辨識發生錯誤（' + e.error + '）。';
+      showHeard(msg, true);
+      renderMic();
+    };
+    rec.onend = function () {
+      voiceFlush(true);
+      V.seen = V.committed = 0;
+      if (V.on && V.rec === rec) {
+        try { rec.start(); return; } catch (err) { V.on = false; }
+      }
+      renderMic();
+    };
+    V.rec = rec;
+    V.on = true;
+    V.seen = V.committed = 0;
+    try { rec.start(); } catch (err) { V.on = false; showHeard('無法啟動語音辨識。', true); }
+    renderMic();
+    if (V.on) showHeard('');
+  }
+
+  function voiceStop() {
+    V.on = false;
+    if (V.rec) { try { V.rec.stop(); } catch (err) { /* 已停止 */ } }
+    renderMic();
+  }
+
+  function renderMic() {
+    var b = $('v-mic');
+    b.classList.toggle('on', V.on);
+    b.setAttribute('aria-pressed', V.on);
+    $('v-label').textContent = V.on ? '聆聽中・點一下停止' : '開始唸';
   }
 
   // ---------- 控制項 ----------
@@ -306,7 +499,14 @@
     $('opt-punct').checked = prefs.showPunct;
     $('opt-retry').checked = prefs.retry;
     $('opt-kb').checked = prefs.kb;
-    $('kb').hidden = !prefs.kb;
+    var voice = prefs.input === 'voice';
+    $('retry-wrap').hidden = voice;
+    $('kb-wrap').hidden = voice;
+    $('kb').hidden = !(prefs.kb || voice);
+    Array.prototype.forEach.call(document.querySelectorAll('#input-seg button'), function (b) {
+      b.setAttribute('aria-checked', b.dataset.in === prefs.input);
+    });
+    syncPanels();
     var art = law.articles[artIdx];
     Array.prototype.forEach.call(document.querySelectorAll('#density button'), function (b) {
       var d = +b.dataset.d;
@@ -314,6 +514,15 @@
       b.querySelector('small').textContent = densityShare(art, d) + '%';
     });
     $('art-select').value = artIdx;
+    updateKbHeight();
+  }
+
+  // 鍵盤區：完成時顯示「下一條」，否則依輸入方式顯示注音鍵盤或語音列
+  function syncPanels() {
+    var done = !!(S && S.done), voice = prefs.input === 'voice';
+    $('kb-done').hidden = !done;
+    $('kb-keys').hidden = done || voice;
+    $('kb-voice').hidden = done || !voice;
     updateKbHeight();
   }
 
@@ -396,6 +605,17 @@
     $('opt-punct').addEventListener('change', function (e) { prefs.showPunct = e.target.checked; savePrefs(); paint(); });
     $('opt-retry').addEventListener('change', function (e) { prefs.retry = e.target.checked; S.missed = false; savePrefs(); paint(); });
     $('opt-kb').addEventListener('change', function (e) { prefs.kb = e.target.checked; savePrefs(); syncControls(); });
+    $('input-seg').addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b || b.dataset.in === prefs.input) return;
+      prefs.input = b.dataset.in;
+      if (prefs.input !== 'voice') voiceStop();
+      fillArticleSelect();
+      startArticle();
+    });
+    $('v-mic').addEventListener('click', function () { if (V.on) voiceStop(); else voiceStart(); });
+    $('v-hint').addEventListener('click', hint);
+    $('v-back').addEventListener('click', back);
     $('law-select').addEventListener('change', function (e) {
       law = LAWS[+e.target.value];
       prefs.law = law.id;
@@ -460,6 +680,7 @@
     }
     buildKeyboard();
     bind();
+    renderMic();
     showLaw();
     startArticle();
   }

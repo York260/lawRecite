@@ -22,6 +22,7 @@ SOURCES = [
     {"id": "police-personnel", "file": ROOT / "data/source/police-personnel.txt"},
 ]
 OUT = ROOT / "data/laws.js"
+SOUNDS_OUT = ROOT / "data/sounds.js"
 
 ZHUYIN = set("ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄧㄨㄩㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦ")
 HAN = re.compile(r"[㐀-鿿]")
@@ -127,6 +128,37 @@ def parse(path):
     return meta, articles
 
 
+def big5_common():
+    """Big5 常用字（A440–C67E，共 5401 字）。"""
+    out = []
+    for lead in range(0xA4, 0xC7):
+        for trail in list(range(0x40, 0x7F)) + list(range(0xA1, 0xFF)):
+            if (lead, trail) > (0xC6, 0x7E):
+                return out
+            try:
+                out.append(bytes([lead, trail]).decode("big5"))
+            except UnicodeDecodeError:
+                pass
+    return out
+
+
+def build_sounds(extra_chars):
+    """語音模式用：無聲調注音 → 同音字，讓辨識出的同音字也算對。"""
+    groups = {}
+    for ch in sorted(set(big5_common()) | set(extra_chars)):
+        if not HAN.match(ch):
+            continue
+        for r in pinyin(ch, style=Style.BOPOMOFO, heteronym=True)[0]:
+            syl = "".join(c for c in r if c in ZHUYIN)
+            if syl and ch not in groups.setdefault(syl, []):
+                groups[syl].append(ch)
+    body = "|".join(f"{syl}:{''.join(chs)}" for syl, chs in sorted(groups.items()))
+    SOUNDS_OUT.write_text(
+        "// 由 scripts/build_data.py 產生，請勿手動修改\nwindow.LAW_SOUNDS = " + json.dumps(body, ensure_ascii=False) + ";\n",
+        encoding="utf-8",
+    )
+
+
 def main():
     laws = []
     for src in SOURCES:
@@ -142,6 +174,7 @@ def main():
         "// 由 scripts/build_data.py 產生，請勿手動修改\nwindow.LAWS = " + body + ";\n",
         encoding="utf-8",
     )
+    build_sounds(c for law in laws for a in law["articles"] for l in a["lines"] for c in l["t"])
     for law in laws:
         chars = [c for a in law["articles"] for l in a["lines"] for c in l["t"] if HAN.match(c)]
         levels = "".join(l["k"] for a in law["articles"] for l in a["lines"])
