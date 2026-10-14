@@ -244,8 +244,10 @@
     keepInView();
   }
 
+  var doneAt = 0;
   function finish() {
     S.done = true;
+    doneAt = Date.now();
     S.pos = S.order.length;
     paint();
     var total = S.order.length, ok = 0, bad = 0, hintN = 0;
@@ -678,10 +680,14 @@
     $('next').addEventListener('click', function () { goTo(artIdx + 1); });
     $('art-select').addEventListener('change', function (e) { goTo(+e.target.value); e.target.blur(); });
     $('restart').addEventListener('click', startArticle);
-    $('r-again').addEventListener('click', startArticle);
-    $('kb-again').addEventListener('click', startArticle);
-    $('r-next').addEventListener('click', function () { goTo(artIdx + 1); });
-    $('kb-next').addEventListener('click', function () { goTo(artIdx + 1); });
+    // 完成按鈕剛好出現在最後一個按鍵的位置，放開手指產生的 click 會誤觸，所以剛完成的一小段時間內忽略
+    var afterDone = function (fn) {
+      return function () { if (Date.now() - doneAt > 800) fn(); };
+    };
+    $('r-again').addEventListener('click', afterDone(startArticle));
+    $('kb-again').addEventListener('click', afterDone(startArticle));
+    $('r-next').addEventListener('click', afterDone(function () { goTo(artIdx + 1); }));
+    $('kb-next').addEventListener('click', afterDone(function () { goTo(artIdx + 1); }));
     $('density').addEventListener('click', function (e) {
       var b = e.target.closest('button');
       if (!b) return;
