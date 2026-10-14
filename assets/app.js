@@ -16,12 +16,30 @@
     var k = code.replace(/^(Digit|Key)/, '');
     KEY_HINT[CODE_MAP[code]] = { Minus: '-', Semicolon: ';', Comma: ',', Period: '.', Slash: '/' }[k] || k.toLowerCase();
   });
-  var KB_ROWS = [
-    ['ㄅ', 'ㄉ', 'ㄓ', 'ㄚ', 'ㄞ', 'ㄢ', 'ㄦ', 'hint', 'back'],
-    ['ㄆ', 'ㄊ', 'ㄍ', 'ㄐ', 'ㄔ', 'ㄗ', 'ㄧ', 'ㄛ', 'ㄟ', 'ㄣ'],
-    ['ㄇ', 'ㄋ', 'ㄎ', 'ㄑ', 'ㄕ', 'ㄘ', 'ㄨ', 'ㄜ', 'ㄠ', 'ㄤ'],
-    ['ㄈ', 'ㄌ', 'ㄏ', 'ㄒ', 'ㄖ', 'ㄙ', 'ㄩ', 'ㄝ', 'ㄡ', 'ㄥ']
-  ];
+  // 螢幕鍵盤排列：cols 為格線欄數，注音鍵各佔 2 欄，功能鍵佔 3 欄
+  var LAYOUTS = {
+    dachen: {
+      cols: 20,
+      rows: [
+        ['ㄅ', 'ㄉ', 'ㄓ', 'ㄚ', 'ㄞ', 'ㄢ', 'ㄦ', 'hint', 'back'],
+        ['ㄆ', 'ㄊ', 'ㄍ', 'ㄐ', 'ㄔ', 'ㄗ', 'ㄧ', 'ㄛ', 'ㄟ', 'ㄣ'],
+        ['ㄇ', 'ㄋ', 'ㄎ', 'ㄑ', 'ㄕ', 'ㄘ', 'ㄨ', 'ㄜ', 'ㄠ', 'ㄤ'],
+        ['ㄈ', 'ㄌ', 'ㄏ', 'ㄒ', 'ㄖ', 'ㄙ', 'ㄩ', 'ㄝ', 'ㄡ', 'ㄥ']
+      ]
+    },
+    // 依注音順序，每列 8 鍵，按鍵較寬
+    order: {
+      cols: 16,
+      rows: [
+        ['ㄅ', 'ㄆ', 'ㄇ', 'ㄈ', 'ㄉ', 'ㄊ', 'ㄋ', 'ㄌ'],
+        ['ㄍ', 'ㄎ', 'ㄏ', 'ㄐ', 'ㄑ', 'ㄒ', 'ㄓ', 'ㄔ'],
+        ['ㄕ', 'ㄖ', 'ㄗ', 'ㄘ', 'ㄙ', 'ㄧ', 'ㄨ', 'ㄩ'],
+        ['ㄚ', 'ㄛ', 'ㄜ', 'ㄝ', 'ㄞ', 'ㄟ', 'ㄠ', 'ㄡ'],
+        ['ㄢ', 'ㄣ', 'ㄤ', 'ㄥ', 'ㄦ', 'hint', 'back']
+      ]
+    }
+  };
+  var MEDIALS = 'ㄧㄨㄩ', FINALS = 'ㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦ';
 
   // 未作答格子的佔位字（透明顯示）；用全形漢字才能和真字一樣寬、一樣斷行
   var BLANK = '囗';
@@ -48,6 +66,10 @@
     showPunct: true,
     retry: false,
     input: 'zhuyin',
+    layout: 'dachen',
+    keySize: coarse ? 'l' : 'm',
+    vibrate: true,
+    theme: 'auto',
     kb: coarse,
     art: {}
   }, store.prefs);
@@ -499,9 +521,18 @@
     $('opt-punct').checked = prefs.showPunct;
     $('opt-retry').checked = prefs.retry;
     $('opt-kb').checked = prefs.kb;
+    $('opt-vibrate').checked = prefs.vibrate;
     var voice = prefs.input === 'voice';
     $('retry-wrap').hidden = voice;
     $('kb-wrap').hidden = voice;
+    $('vibrate-wrap').hidden = voice || !navigator.vibrate;
+    $('layout-row').hidden = voice;
+    $('size-row').hidden = voice;
+    [['#layout-seg', 'layout', prefs.layout], ['#size-seg', 'size', prefs.keySize]].forEach(function (g) {
+      Array.prototype.forEach.call(document.querySelectorAll(g[0] + ' button'), function (b) {
+        b.setAttribute('aria-checked', b.dataset[g[1]] === g[2]);
+      });
+    });
     $('kb').hidden = !(prefs.kb || voice);
     Array.prototype.forEach.call(document.querySelectorAll('#input-seg button'), function (b) {
       b.setAttribute('aria-checked', b.dataset.in === prefs.input);
@@ -533,7 +564,12 @@
 
   function buildKeyboard() {
     var wrap = $('kb-keys');
-    KB_ROWS.forEach(function (row) {
+    var layout = LAYOUTS[prefs.layout] || LAYOUTS.dachen;
+    wrap.textContent = '';
+    wrap.style.gridTemplateColumns = 'repeat(' + layout.cols + ', 1fr)';
+    wrap.dataset.layout = prefs.layout;
+    $('kb').dataset.size = prefs.keySize;
+    layout.rows.forEach(function (row) {
       row.forEach(function (k) {
         var b = document.createElement('button');
         b.type = 'button';
@@ -542,6 +578,7 @@
         else if (k === 'back') { b.className += ' fn'; b.textContent = '⌫'; b.dataset.act = 'back'; b.setAttribute('aria-label', '退回一字'); }
         else {
           b.dataset.sym = k;
+          b.className += MEDIALS.indexOf(k) !== -1 ? ' g-m' : FINALS.indexOf(k) !== -1 ? ' g-f' : ' g-i';
           b.textContent = k;
           var s = document.createElement('small');
           s.textContent = KEY_HINT[k];
@@ -550,22 +587,72 @@
         wrap.appendChild(b);
       });
     });
+    updateKbHeight();
+  }
 
-    function press(b) {
-      if (b.dataset.sym) input(b.dataset.sym);
-      else if (b.dataset.act === 'hint') hint();
-      else if (b.dataset.act === 'back') back();
-    }
-    // 觸控用 pointerdown 反應較快；鍵盤操作按鈕（detail === 0）時走 click
+  function pressKey(b) {
+    if (b.dataset.sym) input(b.dataset.sym);
+    else if (b.dataset.act === 'hint') hint();
+    else if (b.dataset.act === 'back') back();
+    if (prefs.vibrate && navigator.vibrate) { try { navigator.vibrate(8); } catch (e) { /* 不支援 */ } }
+  }
+
+  // 放開手指才輸入：按住時放大顯示，可滑到旁邊的鍵修正，滑出鍵盤放開則取消
+  var pressing = {};
+  function showActive() {
+    var keys = [];
+    Object.keys(pressing).forEach(function (id) { if (pressing[id]) keys.push(pressing[id]); });
+    Array.prototype.forEach.call(document.querySelectorAll('#kb-keys .key.pressed'), function (b) {
+      if (keys.indexOf(b) === -1) b.classList.remove('pressed');
+    });
+    keys.forEach(function (b) { b.classList.add('pressed'); });
+    var pop = $('key-pop'), last = keys[keys.length - 1];
+    if (!last || !last.dataset.sym) { pop.hidden = true; return; }
+    var r = last.getBoundingClientRect();
+    pop.textContent = last.dataset.sym;
+    pop.style.left = (r.left + r.width / 2) + 'px';
+    pop.style.top = r.top + 'px';
+    pop.hidden = false;
+  }
+  function commitPress(id) {
+    var b = pressing[id];
+    delete pressing[id];
+    showActive();
+    if (b) pressKey(b);
+  }
+  function keyAt(x, y) {
+    var el = document.elementFromPoint(x, y);
+    return el && el.closest ? el.closest('#kb-keys .key') : null;
+  }
+
+  function bindKeyboard() {
+    var wrap = $('kb-keys');
     wrap.addEventListener('pointerdown', function (e) {
       var b = e.target.closest('.key');
       if (!b) return;
       e.preventDefault();
-      press(b);
+      // 兩指快速輪流按時，先送出前一個鍵
+      Object.keys(pressing).forEach(function (id) { commitPress(id); });
+      pressing[e.pointerId] = b;
+      try { wrap.setPointerCapture(e.pointerId); } catch (err) { /* 不支援 */ }
+      showActive();
     });
+    wrap.addEventListener('pointermove', function (e) {
+      if (!(e.pointerId in pressing)) return;
+      var b = keyAt(e.clientX, e.clientY);
+      if (b !== pressing[e.pointerId]) { pressing[e.pointerId] = b; showActive(); }
+    });
+    wrap.addEventListener('pointerup', function (e) {
+      if (e.pointerId in pressing) commitPress(e.pointerId);
+    });
+    wrap.addEventListener('pointercancel', function (e) {
+      delete pressing[e.pointerId];
+      showActive();
+    });
+    // 用鍵盤操作按鈕（Tab 到按鍵再按 Enter）時 detail 為 0
     wrap.addEventListener('click', function (e) {
       var b = e.target.closest('.key');
-      if (b && e.detail === 0) press(b);
+      if (b && e.detail === 0) pressKey(b);
     });
     $('kb').addEventListener('contextmenu', function (e) { e.preventDefault(); });
   }
@@ -613,6 +700,45 @@
       fillArticleSelect();
       startArticle();
     });
+    $('theme-btn').addEventListener('click', function () {
+      prefs.theme = isDark() ? 'light' : 'dark';
+      savePrefs();
+      applyTheme();
+    });
+    $('theme-seg').addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      prefs.theme = b.dataset.themeOpt;
+      savePrefs();
+      applyTheme();
+    });
+    if (darkQuery) {
+      var onScheme = function () { applyTheme(); };
+      if (darkQuery.addEventListener) darkQuery.addEventListener('change', onScheme);
+      else if (darkQuery.addListener) darkQuery.addListener(onScheme);
+    }
+    $('settings-btn').addEventListener('click', function () {
+      var panel = $('settings');
+      panel.hidden = !panel.hidden;
+      $('settings-btn').setAttribute('aria-expanded', !panel.hidden);
+    });
+    $('layout-seg').addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      prefs.layout = b.dataset.layout;
+      savePrefs();
+      buildKeyboard();
+      syncControls();
+    });
+    $('size-seg').addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      prefs.keySize = b.dataset.size;
+      savePrefs();
+      buildKeyboard();
+      syncControls();
+    });
+    $('opt-vibrate').addEventListener('change', function (e) { prefs.vibrate = e.target.checked; savePrefs(); });
     $('v-mic').addEventListener('click', function () { if (V.on) voiceStop(); else voiceStart(); });
     $('v-hint').addEventListener('click', hint);
     $('v-back').addEventListener('click', back);
@@ -651,11 +777,33 @@
       var b = e.target.closest('button');
       if (b && e.detail > 0) b.blur();
     });
-    Array.prototype.forEach.call(document.querySelectorAll('.tools input[type=checkbox]'), function (c) {
+    Array.prototype.forEach.call(document.querySelectorAll('.settings input[type=checkbox]'), function (c) {
       c.addEventListener('change', function () { c.blur(); });
     });
 
     window.addEventListener('resize', updateKbHeight);
+  }
+
+  // ---------- 白天／黑夜 ----------
+  var darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  var hostTheme = window.__hostTheme === undefined ? null : window.__hostTheme;
+  function applyTheme() {
+    var root = document.documentElement;
+    var t = prefs.theme === 'light' || prefs.theme === 'dark' ? prefs.theme : hostTheme;
+    if (t) root.setAttribute('data-theme', t); else root.removeAttribute('data-theme');
+    var dark = isDark();
+    var btn = $('theme-btn');
+    btn.classList.toggle('is-dark', dark);
+    btn.setAttribute('aria-label', dark ? '切換成白天模式' : '切換成黑夜模式');
+    btn.title = btn.getAttribute('aria-label');
+    Array.prototype.forEach.call(document.querySelectorAll('#theme-seg button'), function (b) {
+      b.setAttribute('aria-checked', b.dataset.themeOpt === prefs.theme);
+    });
+  }
+  function isDark() {
+    var attr = document.documentElement.getAttribute('data-theme');
+    if (attr) return attr === 'dark';
+    return !!(darkQuery && darkQuery.matches);
   }
 
   function showLaw() {
@@ -678,7 +826,9 @@
       ls.value = LAWS.indexOf(law);
       ls.hidden = false;
     }
+    applyTheme();
     buildKeyboard();
+    bindKeyboard();
     bind();
     renderMic();
     showLaw();
