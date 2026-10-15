@@ -601,7 +601,8 @@
     try {
       localStorage.setItem(ACTIVE_KEY, JSON.stringify({
         code: G.code, slot: G.slot, name: G.me.name, opp: G.opp.name, uid: uid,
-        i: G.nextI, doneW: G.doneW - G.pausedW, doneOk: G.doneOk, sent: G.sent, at: now
+        i: G.nextI, doneW: G.doneW, pausedW: G.pausedW, doneOk: G.doneOk,
+        artW: G.artMaxW, artOk: G.artMaxOk, snap: APP.duelSnapshot(), sent: G.sent, at: now
       }));
     } catch (e) { /* 無法儲存 */ }
   }
@@ -672,7 +673,10 @@
       G.me.f = G.frozen = !!sent.f;
       G.me.s = sent.s || 0;
       G.doneW = rec.doneW;
+      G.pausedW = rec.pausedW || 0;
       G.doneOk = rec.doneOk;
+      // 目前這條打到一半的進度也還原，回來時停在原本的字
+      if (rec.snap) { G.artMaxW = rec.artW || 0; G.artMaxOk = rec.artOk || 0; }
       G.nextI = rec.i;
       G.opp = { name: opp.name || '對手', d: opp.d || 0, n: opp.n || 0, f: !!opp.f, s: opp.s || 0, seen: true };
       G.online = true;
@@ -685,11 +689,11 @@
       clearInterval(resumeTimer);
       G.room.child('p/' + G.slot).onDisconnect().remove();
       msg('');
-      play(Math.min(G.nextI, G.seq.length - 1));
+      play(Math.min(G.nextI, G.seq.length - 1), rec.snap);
       watchOpponent();
       watchConn();
       if (G.slot === 'g') watchHost();
-      note(G.me.f ? '' : '回到對戰了，從第 ' + APP.law().articles[G.seq[Math.min(G.nextI, G.seq.length - 1)]].id + ' 條接著背');
+      note(G.me.f ? '' : '回到對戰了，從中斷的地方接著背');
       if (!G.me.f) setTimeout(function () { if (G && G.phase === 'play' && !G.oppGoneAt) note(''); }, 2500);
       checkEnd();
     }).catch(function (err) {
@@ -792,7 +796,7 @@
     }
   }
 
-  function play(start) {
+  function play(start, restore) {
     closeModal();
     G.phase = 'play';
     G.total = Math.max(1, seqTotal(G.seq, G.cfg));
@@ -813,7 +817,8 @@
       density: G.cfg.density,
       onPaint: onPaint,
       onArticleDone: onArticleDone,
-      start: start || 0
+      start: start || 0,
+      restore: restore || null
     });
     var g = G;
     saveActive(true);
@@ -840,6 +845,7 @@
     }
     renderCombo(st.streak);
     renderHud();
+    saveActive(true);
     checkEnd();
   }
 

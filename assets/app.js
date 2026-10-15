@@ -257,6 +257,25 @@
     document.body.classList.remove('on-home');
     artIdx = o.seq[DUEL.i];
     startArticle();
+    if (o.restore) restoreArticle(o.restore);
+  }
+  // 對戰中目前這條的進度：每格的對錯（o 對、x 錯、h 提示、- 未打）與游標位置
+  var ST_CODE = { ok: 'o', bad: 'x', hint: 'h' };
+  var CODE_ST = { o: 'ok', x: 'bad', h: 'hint' };
+  function duelSnapshot() {
+    if (!DUEL || !S || S.done) return null;
+    return {
+      art: S.art.id,
+      pos: S.pos,
+      st: S.order.map(function (ci) { return ST_CODE[S.cells[ci].st] || '-'; }).join('')
+    };
+  }
+  function restoreArticle(snap) {
+    if (!S || snap.art !== S.art.id || snap.st.length !== S.order.length) return;
+    S.order.forEach(function (ci, k) { S.cells[ci].st = CODE_ST[snap.st.charAt(k)] || null; });
+    S.pos = Math.min(snap.pos, S.order.length);
+    paint();
+    keepInView();
   }
   function duelEnd() {
     if (!DUEL) return;
@@ -1237,6 +1256,7 @@
     lastCellRect: lastCellRect,
     duelBegin: duelBegin,
     duelEnd: duelEnd,
+    duelSnapshot: duelSnapshot,
     inDuel: function () { return !!DUEL; },
     showHome: showHome,
     showToast: showToast
