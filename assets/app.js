@@ -54,6 +54,7 @@
   var store = loadStore();
   store.prefs = store.prefs || {};
   store.progress = store.progress || {};
+  store.srs = store.srs || {};
   function saveStore() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { /* 無痕或封鎖時略過 */ }
   }
@@ -158,6 +159,7 @@
     savePrefs();
     syncControls();
     paint();
+    renderReview();
     scrollToSheet();
     if (!order.length) finish();
   }
@@ -260,8 +262,12 @@
     $('r-text').textContent = total
       ? '共 ' + total + ' 字，答對 ' + ok + '、' + (prefs.input === 'voice' ? '唸錯／漏唸 ' : '打錯 ') + bad + '、提示 ' + hintN
       : '這一條在目前的挖空程度沒有空格';
-    var last = artIdx === law.articles.length - 1;
-    $('r-next').textContent = $('kb-next').textContent = last ? '回到第 ' + law.articles[0].id + ' 條' : '下一條 →';
+    var srsNote = total ? updateReview(S.art, bad + hintN === 0) : '';
+    $('r-srs').textContent = srsNote;
+    $('r-srs').hidden = !srsNote;
+    $('kb-srs').textContent = srsNote;
+    $('kb-srs').hidden = !srsNote;
+    $('r-next').textContent = $('kb-next').textContent = nextLabel();
     $('result').hidden = false;
     syncPanels();
 
@@ -275,6 +281,7 @@
       saveStore();
       fillArticleSelect();
     }
+    renderReview();
     setTimeout(function () { reveal($('result')); }, 30);
   }
 
@@ -288,7 +295,107 @@
     window.scrollTo(0, Math.max(0, y));
   }
 
+  // ---------- 間隔複習 ----------
+  // 有錯字或用了提示的條文排入複習：隔 1 天、3 天、7 天各複習一次，全對才往下一關，
+  // 又錯就從 1 天重來；7 天那次也全對就算熟記，移出複習。
+  var INTERVALS = [1, 3, 7];
+  var R = null; // 進行中的複習：{ queue: [條文 index], i }
+
+  function dayStr(offset) {
+    var d = new Date();
+    d.setDate(d.getDate() + (offset || 0));
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function srsKey(art) { return law.id + ':' + art.id; }
+  function isDue(art) {
+    var item = store.srs[srsKey(art)];
+    return !!item && item.due <= dayStr(0);
+  }
+  function dueList() {
+    var out = [];
+    law.articles.forEach(function (art, i) { if (isDue(art)) out.push(i); });
+    return out;
+  }
+  function fmtDays(n) { return n === 1 ? '明天' : n + ' 天後'; }
+
+  // 依這次結果更新複習排程，回傳要顯示在結果上的一句話
+  function updateReview(art, perfect) {
+    var key = srsKey(art), item = store.srs[key], due = isDue(art), note = '';
+    if (!perfect) {
+      store.srs[key] = { stage: 0, due: dayStr(INTERVALS[0]), lapses: item ? (item.lapses || 0) + 1 : 0 };
+      note = '已排入複習：' + fmtDays(INTERVALS[0]) + '再背一次';
+    } else if (item && due) {
+      var stage = item.stage + 1;
+      if (stage >= INTERVALS.length) {
+        delete store.srs[key];
+        note = '複習全對三次，這條已熟記，移出複習';
+      } else {
+        store.srs[key] = { stage: stage, due: dayStr(INTERVALS[stage]), lapses: item.lapses || 0 };
+        note = '複習通過，下次：' + fmtDays(INTERVALS[stage]);
+      }
+    } else if (item) {
+      note = '這條在複習清單中，' + item.due.slice(5).replace('-', '/') + ' 再複習';
+    }
+    saveStore();
+    return note;
+  }
+
+  function renderReview() {
+    var n = dueList().length;
+    var btn = $('review-btn');
+    btn.textContent = R ? '結束複習' : '複習 ' + n;
+    btn.classList.toggle('has-due', !R && n > 0);
+    btn.disabled = !R && n === 0;
+    btn.title = n ? '今天有 ' + n + ' 條要複習' : '今天沒有要複習的條文';
+    $('review-bar').hidden = !R;
+    if (R) $('review-pos').textContent = '複習中　第 ' + (R.i + 1) + ' / ' + R.queue.length + ' 條';
+  }
+
+  function startReview() {
+    var q = dueList();
+    if (!q.length) return;
+    R = { queue: q, i: 0 };
+    artIdx = q[0];
+    startArticle();
+  }
+  function endReview() {
+    R = null;
+    renderReview();
+    if (S && S.done) $('r-next').textContent = $('kb-next').textContent = nextLabel();
+  }
+
+  function nextLabel() {
+    if (R) return R.i + 1 < R.queue.length ? '下一條複習 →' : '完成複習 ✓';
+    return artIdx === law.articles.length - 1 ? '回到第 ' + law.articles[0].id + ' 條' : '下一條 →';
+  }
+  function nextArticle() {
+    if (R) {
+      R.i++;
+      if (R.i >= R.queue.length) {
+        endReview();
+        goTo(artIdx + 1);
+        showToast('今天的複習完成了！');
+        return;
+      }
+      artIdx = R.queue[R.i];
+      startArticle();
+      return;
+    }
+    goTo(artIdx + 1);
+  }
+
+  var toastTimer = 0;
+  function showToast(text) {
+    var t = $('toast');
+    t.textContent = text;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, 2600);
+  }
+
+  // 手動換條（上一條、下一條、選單）會離開複習
   function goTo(i) {
+    if (R) endReview();
     var n = law.articles.length;
     artIdx = (i + n) % n;
     startArticle();
@@ -442,7 +549,7 @@
     showHeard(text);
     if (!S) return;
     if (S.done) {
-      if (/下一[條条]/.test(text)) { V.committed = V.seen; goTo(artIdx + 1); }
+      if (/下一[條条]/.test(text)) { V.committed = V.seen; nextArticle(); }
       else if (allFinal) V.committed = V.seen;
       return;
     }
@@ -519,7 +626,8 @@
       var opt = document.createElement('option');
       opt.value = i;
       var rec = store.progress[progressKey(art)];
-      opt.textContent = '第 ' + art.id + ' 條' + (rec ? (rec.best === 100 ? '  ✓' : '  ' + rec.best + '%') : '');
+      opt.textContent = '第 ' + art.id + ' 條' + (rec ? (rec.best === 100 ? '  ✓' : '  ' + rec.best + '%') : '') +
+        (isDue(art) ? '  ⟳' : '');
       group.appendChild(opt);
     });
     sel.value = artIdx;
@@ -698,8 +806,9 @@
     };
     $('r-again').addEventListener('click', afterDone(startArticle));
     $('kb-again').addEventListener('click', afterDone(startArticle));
-    $('r-next').addEventListener('click', afterDone(function () { goTo(artIdx + 1); }));
-    $('kb-next').addEventListener('click', afterDone(function () { goTo(artIdx + 1); }));
+    $('r-next').addEventListener('click', afterDone(nextArticle));
+    $('kb-next').addEventListener('click', afterDone(nextArticle));
+    $('review-btn').addEventListener('click', function () { if (R) endReview(); else startReview(); });
     $('density').addEventListener('click', function (e) {
       var b = e.target.closest('button');
       if (!b) return;
@@ -776,7 +885,7 @@
       if ((tag === 'button' || tag === 'input') && (e.key === 'Enter' || e.key === ' ')) return;
       if (e.key === 'Backspace') { e.preventDefault(); back(); return; }
       if (e.key === 'Enter') {
-        if (S && S.done) { e.preventDefault(); goTo(artIdx + 1); }
+        if (S && S.done) { e.preventDefault(); nextArticle(); }
         return;
       }
       if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); hint(); return; }
@@ -849,6 +958,7 @@
     bindKeyboard();
     bind();
     renderMic();
+    renderReview();
     showLaw();
     startArticle();
   }
