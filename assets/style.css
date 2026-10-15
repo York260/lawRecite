@@ -863,3 +863,6 @@ body.on-home { padding-bottom: 28px; }
 
 /* 練習頁頂部：只留「‹ 律刃」與法規名 */
 .brand-home .app-name { font-size: 16px; }
+.resume-left { margin: 0 0 14px; color: var(--muted); }
+.resume-left b { color: var(--seal); font-size: 1.25em; font-variant-numeric: tabular-nums; }
+#duel-resume .link-btn { display: block; margin: 14px auto 0; color: var(--muted); }

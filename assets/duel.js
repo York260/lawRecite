@@ -30,8 +30,9 @@
   var SYNC_MS = 250;
   var MAX_D_STEP = 40;      // 與安全規則一致：每次寫入的增量上限
   var MAX_N_STEP = 20;
-  var GRACE_MS = 30000;     // 對手斷線後等這麼久還沒回來才判勝
-  var SELF_GRACE_MS = 20000; // 自己斷線超過這麼久，回來時直接判負（比對手的等待短，兩邊才不會都判贏）
+  var GRACE_MS = 60000;     // 對手斷線後等這麼久還沒回來才判勝（要夠重開網頁回來）
+  var SELF_GRACE_MS = 45000; // 自己斷線超過這麼久，回來時直接判負（比對手的等待短，兩邊才不會都判贏）
+  var ACTIVE_KEY = 'lawRecite.activeDuel'; // 進行中的對戰，關掉網頁後重開可以接回去
   var CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   var NAME_KEY = 'lawRecite.duelName';
 
@@ -196,6 +197,8 @@
 
   // 按「雙人對決」：先確認登入，再進大廳
   function startDuelFlow(code) {
+    var rec = !code && activeDuel();
+    if (rec) { openResume(rec); return; }
     var go = function () { openLobby(code); };
     if (!cachedAccount()) { openAccount(go); return; }
     loadSdk().then(function (user) {
@@ -217,6 +220,8 @@
       online: false, offlineAt: 0,       // 自己的連線狀態
       oppGoneAt: 0, graceTimer: 0,       // 對手斷線的等待
       rejoinAt: 0, stormUntil: 0,
+      nextI: 0, savedAt: 0,              // 下一條要背的位置；上次存進手機的時間
+      floorD: 0, floorN: 0, frozen: false, // 接回對戰時：已送出的數字不倒退；已背完就不再加傷害
       doneW: 0, doneOk: 0,               // 已背完條文的累計
       artMaxW: 0, artMaxOk: 0,           // 目前條文看過的最大值（語音暫定結果會回退）
       timer: 0, listeners: [], countTimer: 0
@@ -225,7 +230,7 @@
 
   // ---------- 畫面 ----------
   function show(section) {
-    ['duel-lobby', 'duel-wait'].forEach(function (id) {
+    ['duel-lobby', 'duel-wait', 'duel-resume'].forEach(function (id) {
       $(id).hidden = id !== section;
     });
     msg('');
@@ -577,10 +582,146 @@
         countdown(t - (s.val() || 0));
       });
     });
-    // 房主關掉房間時（房間整個消失）
+    watchHost();
+  }
+  // 房主關掉房間時（房間整個消失）
+  function watchHost() {
     on(G.room.child('host'), 'value', function (snap) {
       if (!snap.exists() && G && G.phase !== 'over') opponentLeft();
     });
+  }
+
+  // ---------- 接回中斷的對戰 ----------
+  function saveActive(force) {
+    if (!G || G.phase !== 'play' || !G.code) return;
+    var now = Date.now();
+    if (!force && now - G.savedAt < 1000) return;
+    G.savedAt = now;
+    try {
+      localStorage.setItem(ACTIVE_KEY, JSON.stringify({
+        code: G.code, slot: G.slot, name: G.me.name, opp: G.opp.name, uid: uid,
+        i: G.nextI, doneW: G.doneW, doneOk: G.doneOk, sent: G.sent, at: now
+      }));
+    } catch (e) { /* 無法儲存 */ }
+  }
+  function clearActive() {
+    try { localStorage.removeItem(ACTIVE_KEY); } catch (e) { /* 無法儲存 */ }
+  }
+  // 還來得及接回的對戰（超過自己的斷線寬限就作廢）
+  function activeDuel() {
+    try {
+      var r = JSON.parse(localStorage.getItem(ACTIVE_KEY) || 'null');
+      if (r && r.code && Date.now() - r.at < SELF_GRACE_MS) return r;
+      if (r) clearActive();
+    } catch (e) { /* 無法讀取 */ }
+    return null;
+  }
+
+  var resumeTimer = 0;
+  function openResume(rec) {
+    $('duel-modal').hidden = false;
+    show('duel-resume');
+    $('resume-go').disabled = $('resume-drop').disabled = false;
+    $('resume-desc').textContent = '和 ' + rec.opp + ' 的對戰還在進行（房號 ' + rec.code + '）。';
+    clearInterval(resumeTimer);
+    var tick = function () {
+      var left = Math.ceil((SELF_GRACE_MS - (Date.now() - rec.at)) / 1000);
+      if (left <= 0) {
+        clearInterval(resumeTimer);
+        clearActive();
+        if (!$('duel-resume').hidden && !$('resume-go').disabled) { openLobby(); msg('離開太久，那場對戰已經判負了'); }
+        return;
+      }
+      $('resume-left').textContent = left;
+    };
+    tick();
+    resumeTimer = setInterval(tick, 500);
+  }
+
+  function resumeDuel() {
+    var rec = activeDuel();
+    if (!rec) { openLobby(); msg('離開太久，那場對戰已經判負了'); return; }
+    $('resume-go').disabled = $('resume-drop').disabled = true;
+    msg('連線中…');
+    var ref, room;
+    connect().then(function () {
+      if (uid !== rec.uid) throw { code: 'gone' };
+      ref = db.ref('rooms/' + rec.code);
+      return ref.once('value');
+    }).then(function (snap) {
+      room = snap.val();
+      var opp = room && room.p && room.p[rec.slot === 'h' ? 'g' : 'h'];
+      var mine = room && room.p && room.p[rec.slot];
+      // 房間沒了、對手已離開或已判勝、座位被別人坐走 → 這場已經結束
+      if (!room || !room.startAt || !opp || opp.q || (mine && mine.uid !== uid)) throw { code: 'gone' };
+      if (Date.now() - rec.at >= SELF_GRACE_MS) throw { code: 'late' };
+      G = blankGame();
+      G.code = rec.code;
+      G.slot = rec.slot;
+      G.oppSlot = rec.slot === 'h' ? 'g' : 'h';
+      G.room = ref;
+      G.cfg = room.cfg;
+      G.seq = seqFromIds(room.cfg.arts);
+      G.me.name = rec.name;
+      // 伺服器上的座位還在就以它為準（規則限制每次增量），否則用手機記下的最後送出值
+      var sent = mine ? { d: mine.d || 0, n: mine.n || 0, f: !!mine.f, s: mine.s || 0 } : rec.sent;
+      G.sent = { d: sent.d, n: sent.n, f: sent.f, s: sent.s || 0 };
+      G.me.d = G.floorD = sent.d;
+      G.me.n = G.floorN = sent.n;
+      G.me.f = G.frozen = !!sent.f;
+      G.me.s = sent.s || 0;
+      G.doneW = rec.doneW;
+      G.doneOk = rec.doneOk;
+      G.nextI = rec.i;
+      G.opp = { name: opp.name || '對手', d: opp.d || 0, n: opp.n || 0, f: !!opp.f, s: opp.s || 0, seen: true };
+      G.online = true;
+      if (mine) return null;
+      var seat = ref.child('p/' + rec.slot);
+      return seat.set({ uid: uid, name: rec.name, d: sent.d, n: sent.n, f: !!sent.f }).then(function () {
+        if (sent.s) seat.child('s').set(sent.s).catch(noop);
+      });
+    }).then(function () {
+      clearInterval(resumeTimer);
+      G.room.child('p/' + G.slot).onDisconnect().remove();
+      msg('');
+      play(Math.min(G.nextI, G.seq.length - 1));
+      watchOpponent();
+      watchConn();
+      if (G.slot === 'g') watchHost();
+      note(G.me.f ? '' : '回到對戰了，從第 ' + APP.law().articles[G.seq[Math.min(G.nextI, G.seq.length - 1)]].id + ' 條接著背');
+      if (!G.me.f) setTimeout(function () { if (G && G.phase === 'play' && !G.oppGoneAt) note(''); }, 2500);
+      checkEnd();
+    }).catch(function (err) {
+      var c = err && err.code;
+      clearInterval(resumeTimer);
+      clearActive();
+      G = null;
+      if (c === 'gone' || c === 'late') { openLobby(); msg(c === 'late' ? '離開太久，那場對戰已經判負了' : '那場對戰已經結束了'); }
+      else fail(err);
+    });
+  }
+  // 放棄：直接認輸，對手不用等寬限
+  function dropDuel() {
+    var rec = activeDuel();
+    clearInterval(resumeTimer);
+    clearActive();
+    openLobby();
+    if (!rec) return;
+    connect().then(function () {
+      if (uid !== rec.uid) return;
+      var seat = db.ref('rooms/' + rec.code + '/p/' + rec.slot);
+      // 座位可能已被斷線清理移除，就連同 q 一起重建一次讓對手看到
+      return seat.once('value').then(function (snap) {
+        var v = snap.val();
+        if (v && v.uid !== uid) return null;
+        var w = v ? seat.child('q').set(true)
+          : seat.set({ uid: uid, name: rec.name, d: rec.sent.d, n: rec.sent.n, f: !!rec.sent.f, q: true });
+        // 稍等再清掉，對手才看得到 q；房主認輸就連房間一起清
+        return w.then(function () {
+          return new Promise(function (r) { setTimeout(r, 2000); });
+        }).then(function () { return (rec.slot === 'h' ? db.ref('rooms/' + rec.code) : seat).remove(); });
+      });
+    }).catch(noop).then(function () { setTimeout(disconnect, 500); });
   }
 
   // ---------- 倒數與開打 ----------
@@ -650,7 +791,7 @@
     }
   }
 
-  function play() {
+  function play(start) {
     closeModal();
     G.phase = 'play';
     G.total = Math.max(1, seqTotal(G.seq, G.cfg));
@@ -670,19 +811,21 @@
       mode: G.cfg.mode,
       density: G.cfg.density,
       onPaint: onPaint,
-      onArticleDone: onArticleDone
+      onArticleDone: onArticleDone,
+      start: start || 0
     });
     var g = G;
+    saveActive(true);
     G.timer = setInterval(function () { sync(g); }, SYNC_MS);
   }
 
   // ---------- 本機戰況 ----------
   function onPaint(st) {
-    if (!G || G.phase !== 'play') return;
+    if (!G || G.phase !== 'play' || G.frozen) return;
     var prevD = G.me.d;
     if (st.w > G.artMaxW) G.artMaxW = st.w;
-    G.me.n = G.doneOk + Math.max(G.artMaxOk, st.ok);
-    G.me.d = Math.min(HP, Math.floor((G.doneW + G.artMaxW) * G.base));
+    G.me.n = Math.max(G.floorN, G.doneOk + Math.max(G.artMaxOk, st.ok));
+    G.me.d = Math.min(HP, Math.max(G.floorD, Math.floor((G.doneW + G.artMaxW) * G.base)));
     if (st.streak > G.maxStreak) G.maxStreak = st.streak;
     if (st.ok > G.artMaxOk) {
       var shots = st.ok - G.artMaxOk;
@@ -697,7 +840,8 @@
   }
 
   function onArticleDone(i, st) {
-    if (!G) return;
+    if (!G || G.frozen) return;
+    G.nextI = i + 1;
     G.doneW += Math.max(st.w, G.artMaxW);
     G.doneOk += Math.max(st.ok, G.artMaxOk);
     G.artMaxW = 0;
@@ -707,12 +851,13 @@
       var before = G.me.d;
       G.doneW += PERFECT_BONUS;
       G.me.s++;
-      G.me.d = Math.min(HP, Math.floor(G.doneW * G.base));
+      G.me.d = Math.min(HP, Math.max(G.floorD, Math.floor(G.doneW * G.base)));
       qiStorm(APP.law().articles[G.seq[i]].id, G.me.d - before);
       renderHud();
       checkEnd();
       if (G.phase !== 'play') return;
     }
+    saveActive(true);
     if (i + 1 >= G.seq.length) {
       G.me.f = true;
       sync();
@@ -725,6 +870,7 @@
   function sync(g) {
     g = g || G;
     if (!g || !g.room) return;
+    if (g === G) saveActive();
     // 全對次數 s 單獨寫、而且先寫：對手會先看到刀氣縱橫，再收到這一擊的傷害
     if (g.me.s > g.sent.s) {
       g.sent.s = g.me.s;
@@ -803,6 +949,7 @@
   function over(result, text) {
     if (G.phase === 'over') return;
     sync();
+    clearActive();
     G.phase = 'over';
     clearInterval(G.countTimer);
     clearInterval(G.graceTimer);
@@ -853,15 +1000,18 @@
     g.listeners.forEach(function (off) { off(); });
     g.listeners = [];
     clearInterval(g.graceTimer);
-    if (quit) g.room.child('p/' + g.slot + '/q').set(true).catch(noop);
     var target = g.slot === 'h' ? g.room : g.room.child('p/' + g.slot);
     target.onDisconnect().cancel();
-    target.remove().catch(function () { /* 房間可能已被對方刪除 */ });
+    var remove = function () { target.remove().catch(function () { /* 房間可能已被對方刪除 */ }); };
+    // 中途離開：先標記 q，稍等再清，對手才收得到認輸
+    if (quit) { g.room.child('p/' + g.slot + '/q').set(true).catch(noop); setTimeout(remove, 1500); }
+    else remove();
     g.room = null;
   }
 
   function cleanup() {
     if (!G) return;
+    clearActive();
     // 已結束的場次由 over() 排定的計時器負責送完數字並清房間
     if (G.phase !== 'over') {
       clearInterval(G.timer);
@@ -1041,9 +1191,11 @@
       $('duel-quit').textContent = '投降';
     }, 2500);
   });
-  // 切到別的 App 時頁面可能只是暫停（persisted），之後還會回來，交給斷線寬限處理
+  // 對戰中關掉或重整網頁不算認輸：伺服器的斷線清理加上寬限，讓人重開網頁接回來
   window.addEventListener('pagehide', function (e) {
-    if (G && !e.persisted) releaseRoom(G, G.phase === 'play' || G.phase === 'count');
+    if (!G || e.persisted) return;
+    if (G.phase === 'play' || G.phase === 'count') saveActive(true);
+    else releaseRoom(G);
   });
 
   // 從邀請連結進來：#duel-ABCD
@@ -1060,6 +1212,13 @@
     loadSdk().then(function () { return fb.auth().getRedirectResult(); }).then(function (r) {
       if (r && r.user) { rememberUser(r.user); APP.showToast('已登入：' + cachedAccount().name); }
     }).catch(function (err) { openAccount(); authError(err); });
+  }
+  $('resume-go').addEventListener('click', resumeDuel);
+  $('resume-drop').addEventListener('click', dropDuel);
+  // 重開網頁時有中斷的對戰 → 直接問要不要回去
+  if (!m && !redirected) {
+    var pending = activeDuel();
+    if (pending) openResume(pending);
   }
   renderAccount();
 })();

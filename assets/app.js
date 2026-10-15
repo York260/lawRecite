@@ -249,13 +249,13 @@
   function duelBegin(o) {
     if (R) endReview();
     DUEL = o;
-    DUEL.i = 0;
+    DUEL.i = Math.min(o.start || 0, o.seq.length - 1); // 斷線回來時從中斷的那條接著背
     DUEL.saved = { mode: prefs.mode, density: prefs.density, art: artIdx };
     prefs.mode = o.mode;
     prefs.density = o.density;
     document.body.classList.add('in-duel');
     document.body.classList.remove('on-home');
-    artIdx = o.seq[0];
+    artIdx = o.seq[DUEL.i];
     startArticle();
   }
   function duelEnd() {
