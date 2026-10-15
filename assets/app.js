@@ -72,6 +72,7 @@
     vibrate: true,
     theme: 'auto',
     fontScale: 1,
+    peek: false,       // 「原文」：空格裡淡淡顯示原字，給初學者照著打
     kb: coarse,
     art: {}
   }, store.prefs);
@@ -148,7 +149,7 @@
       body.appendChild(row);
     });
 
-    S = { art: art, cells: cells, order: order, han: han, pos: 0, done: false, missed: false };
+    S = { art: art, cells: cells, order: order, han: han, pos: 0, done: false, missed: false, peeked: peeking() };
     voiceFlush(false);
     showHeard('');
     $('chapter').textContent = art.chapter;
@@ -171,6 +172,7 @@
     if (cell.typeable) {
       cls += ' t';
       if (cell.st) cls += ' ' + cell.st;
+      else if (peeking()) cls += ' blank ghost';
       else { cls += ' blank'; txt = BLANK; }
       if (!S.done && S.order[S.pos] === cell.idx) {
         cls += ' cur';
@@ -178,12 +180,28 @@
       }
     } else if (cell.punct) {
       cls += ' p';
-      if (prefs.mode === 'full' && !prefs.showPunct && !S.done && cell.before > S.pos) { cls += ' blank'; txt = BLANK; }
+      if (prefs.mode === 'full' && !prefs.showPunct && !S.done && cell.before > S.pos) {
+        if (peeking()) cls += ' blank ghost';
+        else { cls += ' blank'; txt = BLANK; }
+      }
     } else {
       cls += ' given';
     }
     if (cell.el.className !== cls) cell.el.className = cls;
     if (cell.el.textContent !== txt) cell.el.textContent = txt;
+  }
+
+  // 對決中不能看原文
+  function peeking() { return prefs.peek && !DUEL; }
+  function setPeek(on) {
+    prefs.peek = on;
+    savePrefs();
+    if (on && S && !S.done) S.peeked = true;
+    syncPeek();
+    if (S) paint();
+  }
+  function syncPeek() {
+    $('peek-btn').setAttribute('aria-pressed', String(prefs.peek));
   }
 
   function paint() {
@@ -334,7 +352,10 @@
     $('r-text').textContent = total
       ? '共 ' + total + ' 字，答對 ' + ok + '、' + (prefs.input === 'voice' ? '唸錯／漏唸 ' : '打錯 ') + bad + '、提示 ' + hintN
       : '這一條在目前的挖空程度沒有空格';
-    var srsNote = total ? updateReview(S.art, bad + hintN === 0) : '';
+    // 看過原文的這一次不計成績、不影響複習排程
+    var counted = total && !S.peeked;
+    if (total && S.peeked) $('r-text').textContent += '・有看原文，這次不計成績';
+    var srsNote = counted ? updateReview(S.art, bad + hintN === 0) : '';
     $('r-srs').textContent = srsNote;
     $('r-srs').hidden = !srsNote;
     $('kb-srs').textContent = srsNote;
@@ -343,7 +364,7 @@
     $('result').hidden = false;
     syncPanels();
 
-    if (total) {
+    if (counted) {
       var key = progressKey(S.art);
       var rec = store.progress[key] || { best: 0, n: 0 };
       rec.best = Math.max(rec.best, pct);
@@ -711,6 +732,7 @@
   }
 
   function syncControls() {
+    syncPeek();
     $('tab-full').setAttribute('aria-selected', prefs.mode === 'full');
     $('tab-cloze').setAttribute('aria-selected', prefs.mode === 'cloze');
     $('density').hidden = prefs.mode !== 'cloze';
@@ -918,6 +940,7 @@
     });
     $('font-dec').addEventListener('click', function () { stepFont(-1); });
     $('font-inc').addEventListener('click', function () { stepFont(1); });
+    $('peek-btn').addEventListener('click', function (e) { setPeek(!prefs.peek); e.currentTarget.blur(); });
     Array.prototype.forEach.call(document.querySelectorAll('.theme-btn'), function (tb) { tb.addEventListener('click', function () {
       prefs.theme = isDark() ? 'light' : 'dark';
       savePrefs();
