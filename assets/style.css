@@ -240,7 +240,16 @@ h1 { margin: 2px 0 0; font: 700 26px/1.2 var(--font-law); letter-spacing: .04em;
 .bar { height: 4px; background: var(--slot); border-radius: 2px; margin-top: 6px; overflow: hidden; }
 .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s; }
 
-.body { font: 500 21px/2.05 var(--font-law); letter-spacing: .02em; }
+.body { font: 500 calc(21px * var(--law-scale, 1))/2.05 var(--font-law); letter-spacing: .02em; }
+.sheet-bar { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin: -6px 0 6px; }
+.duel-only { display: none !important; }
+.in-duel .duel-only { display: inline-flex !important; }
+.seg.mini button { padding: 2px 10px; font-size: 13px; }
+.zoom { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 999px; padding: 2px; font-size: 13px; }
+.zoom button { border: 0; background: none; min-width: 34px; height: 26px; border-radius: 999px; font-weight: 700; color: var(--ink); }
+.zoom button:hover:not(:disabled) { background: var(--slot); }
+.zoom button:disabled { opacity: .35; cursor: default; }
+.zoom span { min-width: 3.2em; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
 .line { display: flex; gap: 8px; }
 .line + .line { margin-top: 4px; }
 .line .label {
@@ -392,7 +401,7 @@ kbd { font: 12px var(--font-ui); border: 1px solid var(--line); border-bottom-wi
   .seg button { padding-inline: 8px; }
   .sheet { padding: 14px 14px 18px; border-radius: 10px; }
   h1 { font-size: 22px; }
-  .body { font-size: 19px; line-height: 2; }
+  .body { font-size: calc(19px * var(--law-scale, 1)); line-height: 2; }
   .meter { min-width: 0; }
   .howto { display: none; }
 }

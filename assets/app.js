@@ -71,6 +71,7 @@
     keySize: coarse ? 'l' : 'm',
     vibrate: true,
     theme: 'auto',
+    fontScale: 1,
     kb: coarse,
     art: {}
   }, store.prefs);
@@ -724,7 +725,7 @@
       });
     });
     $('kb').hidden = !(prefs.kb || voice);
-    Array.prototype.forEach.call(document.querySelectorAll('#input-seg button'), function (b) {
+    Array.prototype.forEach.call(document.querySelectorAll('#input-seg button, #duel-input button'), function (b) {
       b.setAttribute('aria-checked', b.dataset.in === prefs.input);
     });
     syncPanels();
@@ -897,11 +898,20 @@
     $('input-seg').addEventListener('click', function (e) {
       var b = e.target.closest('button');
       if (!b || b.dataset.in === prefs.input) return;
-      prefs.input = b.dataset.in;
-      if (prefs.input !== 'voice') voiceStop();
+      setInput(b.dataset.in);
       fillArticleSelect();
       startArticle();
     });
+    // 對決中切換：不重來，保留目前進度與連斬
+    $('duel-input').addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b || b.dataset.in === prefs.input) return;
+      setInput(b.dataset.in);
+      syncControls();
+      keepInView();
+    });
+    $('font-dec').addEventListener('click', function () { stepFont(-1); });
+    $('font-inc').addEventListener('click', function () { stepFont(1); });
     Array.prototype.forEach.call(document.querySelectorAll('.theme-btn'), function (tb) { tb.addEventListener('click', function () {
       prefs.theme = isDark() ? 'light' : 'dark';
       savePrefs();
@@ -1009,6 +1019,31 @@
     return !!(darkQuery && darkQuery.matches);
   }
 
+  function setInput(v) {
+    prefs.input = v;
+    if (v !== 'voice') voiceStop();
+    savePrefs();
+  }
+
+  // ---------- 條文字級 ----------
+  var FONT_STEPS = [0.8, 0.9, 1, 1.15, 1.3, 1.5, 1.75];
+  function applyFont() {
+    var i = FONT_STEPS.indexOf(prefs.fontScale);
+    if (i < 0) { prefs.fontScale = 1; i = 2; }
+    document.documentElement.style.setProperty('--law-scale', prefs.fontScale);
+    $('font-val').textContent = Math.round(prefs.fontScale * 100) + '%';
+    $('font-dec').disabled = i === 0;
+    $('font-inc').disabled = i === FONT_STEPS.length - 1;
+  }
+  function stepFont(d) {
+    var i = FONT_STEPS.indexOf(prefs.fontScale);
+    var j = Math.max(0, Math.min(FONT_STEPS.length - 1, (i < 0 ? 2 : i) + d));
+    prefs.fontScale = FONT_STEPS[j];
+    savePrefs();
+    applyFont();
+    keepInView();
+  }
+
   // ---------- 首頁 ----------
   var MODE_NAME = { full: '逐字背誦', cloze: '關鍵字填空' };
   function showHome() {
@@ -1103,6 +1138,7 @@
       ls.hidden = false;
     }
     applyTheme();
+    applyFont();
     buildKeyboard();
     bindKeyboard();
     bind();
