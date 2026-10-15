@@ -1,0 +1,402 @@
+{
+ "fetched": "2026-10-15",
+ "source": "https://raw.githubusercontent.com/kong0107/mojLawSplitJSON/gh-pages/",
+ "laws": [
+  {
+   "group": "警察組織與職權",
+   "pcode": "D0080001",
+   "name": "警察法",
+   "type": "法律",
+   "lastUpdate": "20020612",
+   "articles": 20,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0080001"
+  },
+  {
+   "group": "警察組織與職權",
+   "pcode": "D0080002",
+   "name": "警察法施行細則",
+   "type": "命令",
+   "lastUpdate": "20001122",
+   "articles": 16,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0080002"
+  },
+  {
+   "group": "警察組織與職權",
+   "pcode": "D0000001",
+   "name": "內政部組織法",
+   "type": "法律",
+   "lastUpdate": "20251210",
+   "articles": 7,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0000001"
+  },
+  {
+   "group": "警察組織與職權",
+   "pcode": "D0000159",
+   "name": "內政部警政署組織法",
+   "type": "法律",
+   "lastUpdate": "20130821",
+   "articles": 9,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0000159"
+  },
+  {
+   "group": "警察組織與職權",
+   "pcode": "A0010036",
+   "name": "中央行政機關組織基準法",
+   "type": "法律",
+   "lastUpdate": "20250120",
+   "articles": 39,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0010036"
+  },
+  {
+   "group": "警察組織與職權",
+   "pcode": "D0080026",
+   "name": "警察勤務條例",
+   "type": "法律",
+   "lastUpdate": "20080702",
+   "articles": 29,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0080026"
+  },
+  {
+   "group": "警察組織與職權",
+   "pcode": "D0080145",
+   "name": "警察職權行使法",
+   "type": "法律",
+   "lastUpdate": "20110427",
+   "articles": 32,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0080145"
+  },
+  {
+   "group": "警察組織與職權",
+   "pcode": "D0080042",
+   "name": "警械使用條例",
+   "type": "法律",
+   "lastUpdate": "20221019",
+   "articles": 18,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0080042"
+  },
+  {
+   "group": "警察組織與職權",
+   "pcode": "D0080067",
+   "name": "社會秩序維護法",
+   "type": "法律",
+   "lastUpdate": "20250611",
+   "articles": 96,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0080067"
+  },
+  {
+   "group": "警察組織與職權",
+   "pcode": "D0080058",
+   "name": "集會遊行法",
+   "type": "法律",
+   "lastUpdate": "20210127",
+   "articles": 35,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0080058"
+  },
+  {
+   "group": "警察組織與職權",
+   "pcode": "C0010001",
+   "name": "刑事訴訟法",
+   "type": "法律",
+   "lastUpdate": "20260513",
+   "articles": 712,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=C0010001"
+  },
+  {
+   "group": "警察人事與倫理",
+   "pcode": "S0020005",
+   "name": "警察人員人事條例",
+   "type": "法律",
+   "lastUpdate": "20250425",
+   "articles": 52,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=S0020005"
+  },
+  {
+   "group": "警察人事與倫理",
+   "pcode": "D0080111",
+   "name": "警察人員陞遷辦法",
+   "type": "命令",
+   "lastUpdate": "20250609",
+   "articles": 33,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0080111"
+  },
+  {
+   "group": "警察人事與倫理",
+   "pcode": "D0080179",
+   "name": "警察人員獎懲標準",
+   "type": "命令",
+   "lastUpdate": "20190815",
+   "articles": 16,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0080179"
+  },
+  {
+   "group": "警察人事與倫理",
+   "pcode": "D0080007",
+   "name": "警察教育條例",
+   "type": "法律",
+   "lastUpdate": "20020605",
+   "articles": 16,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0080007"
+  },
+  {
+   "group": "警察人事與倫理",
+   "pcode": "S0020038",
+   "name": "公務員服務法",
+   "type": "法律",
+   "lastUpdate": "20220622",
+   "articles": 27,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=S0020038"
+  },
+  {
+   "group": "警察人事與倫理",
+   "pcode": "S0040001",
+   "name": "公務人員考績法",
+   "type": "法律",
+   "lastUpdate": "20251119",
+   "articles": 25,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=S0040001"
+  },
+  {
+   "group": "警察人事與倫理",
+   "pcode": "S0120001",
+   "name": "公務人員保障法",
+   "type": "法律",
+   "lastUpdate": "20250709",
+   "articles": 111,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=S0120001"
+  },
+  {
+   "group": "性別平等",
+   "pcode": "N0030014",
+   "name": "性別平等工作法",
+   "type": "法律",
+   "lastUpdate": "20230816",
+   "articles": 50,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030014"
+  },
+  {
+   "group": "性別平等",
+   "pcode": "H0080067",
+   "name": "性別平等教育法",
+   "type": "法律",
+   "lastUpdate": "20230816",
+   "articles": 48,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=H0080067"
+  },
+  {
+   "group": "性別平等",
+   "pcode": "D0050074",
+   "name": "性騷擾防治法",
+   "type": "法律",
+   "lastUpdate": "20230816",
+   "articles": 34,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0050074"
+  },
+  {
+   "group": "性別平等",
+   "pcode": "D0080079",
+   "name": "性侵害犯罪防治法",
+   "type": "法律",
+   "lastUpdate": "20230215",
+   "articles": 56,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0080079"
+  },
+  {
+   "group": "性別平等",
+   "pcode": "D0050071",
+   "name": "家庭暴力防治法",
+   "type": "法律",
+   "lastUpdate": "20231206",
+   "articles": 77,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0050071"
+  },
+  {
+   "group": "財務與預算",
+   "pcode": "T0020001",
+   "name": "預算法",
+   "type": "法律",
+   "lastUpdate": "20210609",
+   "articles": 101,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=T0020001"
+  },
+  {
+   "group": "財務與預算",
+   "pcode": "T0020005",
+   "name": "決算法",
+   "type": "法律",
+   "lastUpdate": "20110525",
+   "articles": 33,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=T0020005"
+  },
+  {
+   "group": "財務與預算",
+   "pcode": "T0030001",
+   "name": "會計法",
+   "type": "法律",
+   "lastUpdate": "20220615",
+   "articles": 123,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=T0030001"
+  },
+  {
+   "group": "財務與預算",
+   "pcode": "U0010001",
+   "name": "審計法",
+   "type": "法律",
+   "lastUpdate": "20151209",
+   "articles": 82,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=U0010001"
+  },
+  {
+   "group": "財務與預算",
+   "pcode": "G0320015",
+   "name": "財政收支劃分法",
+   "type": "法律",
+   "lastUpdate": "20251203",
+   "articles": 44,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=G0320015"
+  },
+  {
+   "group": "財務與預算",
+   "pcode": "G0360033",
+   "name": "公共債務法",
+   "type": "法律",
+   "lastUpdate": "20210609",
+   "articles": 13,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=G0360033"
+  },
+  {
+   "group": "財務與預算",
+   "pcode": "A0040003",
+   "name": "地方制度法",
+   "type": "法律",
+   "lastUpdate": "20251203",
+   "articles": 107,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0040003"
+  },
+  {
+   "group": "後勤與採購",
+   "pcode": "A0030057",
+   "name": "政府採購法",
+   "type": "法律",
+   "lastUpdate": "20190522",
+   "articles": 123,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0030057"
+  },
+  {
+   "group": "後勤與採購",
+   "pcode": "A0030058",
+   "name": "政府採購法施行細則",
+   "type": "命令",
+   "lastUpdate": "20210714",
+   "articles": 127,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0030058"
+  },
+  {
+   "group": "後勤與採購",
+   "pcode": "A0030099",
+   "name": "投標廠商資格與特殊或巨額採購認定標準",
+   "type": "命令",
+   "lastUpdate": "20151029",
+   "articles": 18,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0030099"
+  },
+  {
+   "group": "後勤與採購",
+   "pcode": "A0030080",
+   "name": "最有利標評選辦法",
+   "type": "命令",
+   "lastUpdate": "20250121",
+   "articles": 25,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0030080"
+  },
+  {
+   "group": "後勤與採購",
+   "pcode": "A0030103",
+   "name": "採購評選委員會組織準則",
+   "type": "命令",
+   "lastUpdate": "20260508",
+   "articles": 11,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0030103"
+  },
+  {
+   "group": "後勤與採購",
+   "pcode": "A0030102",
+   "name": "採購評選委員會審議規則",
+   "type": "命令",
+   "lastUpdate": "20211104",
+   "articles": 19,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0030102"
+  },
+  {
+   "group": "後勤與採購",
+   "pcode": "G0370001",
+   "name": "國有財產法",
+   "type": "法律",
+   "lastUpdate": "20181121",
+   "articles": 79,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=G0370001"
+  },
+  {
+   "group": "後勤與採購",
+   "pcode": "G0370002",
+   "name": "國有財產法施行細則",
+   "type": "命令",
+   "lastUpdate": "20100723",
+   "articles": 85,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=G0370002"
+  },
+  {
+   "group": "後勤與採購",
+   "pcode": "D0080043",
+   "name": "各級警察機關學校武器彈藥統籌調配辦法",
+   "type": "命令",
+   "lastUpdate": "20190604",
+   "articles": 8,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0080043"
+  },
+  {
+   "group": "行政法通則",
+   "pcode": "A0000001",
+   "name": "中華民國憲法",
+   "type": "憲法",
+   "lastUpdate": "19470101",
+   "articles": 175,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000001"
+  },
+  {
+   "group": "行政法通則",
+   "pcode": "A0000002",
+   "name": "中華民國憲法增修條文",
+   "type": "憲法",
+   "lastUpdate": "20050610",
+   "articles": 12,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000002"
+  },
+  {
+   "group": "行政法通則",
+   "pcode": "A0030055",
+   "name": "行政程序法",
+   "type": "法律",
+   "lastUpdate": "20210120",
+   "articles": 176,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0030055"
+  },
+  {
+   "group": "行政法通則",
+   "pcode": "A0030023",
+   "name": "行政執行法",
+   "type": "法律",
+   "lastUpdate": "20100203",
+   "articles": 45,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0030023"
+  },
+  {
+   "group": "行政法通則",
+   "pcode": "A0030210",
+   "name": "行政罰法",
+   "type": "法律",
+   "lastUpdate": "20220615",
+   "articles": 46,
+   "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0030210"
+  }
+ ]
+}
