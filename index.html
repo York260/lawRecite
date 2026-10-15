@@ -17,8 +17,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;700;900&display=swap">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@700&amp;text=%E5%88%80%E6%B0%A3%E7%B8%B1%E6%A9%AB&amp;display=swap">
-<link rel="stylesheet" href="assets/style.css?v=99346ea1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@700&amp;text=%E5%88%80%E6%B0%A3%E7%B8%B1%E6%A9%AB%E5%8F%83%E8%B2%B3%E5%A3%B9%E6%96%AC%E5%8B%9D%E6%95%97%E5%92%8C%E9%80%A30123456789-%2B&amp;display=swap">
+<link rel="stylesheet" href="assets/style.css?v=9e9db54c">
 </head>
 <body>
 <!--APP-->
@@ -118,20 +118,32 @@
 </header>
 
 <div class="duel-hud" id="duel-hud" hidden>
-  <div class="hp me">
-    <div class="hp-top"><b id="hp-me-name">我</b><span id="hp-me-val">100</span></div>
-    <div class="hp-bar"><i id="hp-me-fill"></i></div>
+  <div class="fighter me">
+    <span class="f-ava" id="me-ava">我</span>
+    <div class="f-info">
+      <div class="f-name"><b id="hp-me-name">我</b><span class="f-hp" id="hp-me-val">100</span></div>
+      <div class="hp-bar"><i class="hp-lag" id="hp-me-lag"></i><i class="hp-fill" id="hp-me-fill"></i></div>
+      <div class="f-prog"><i id="me-prog"></i></div>
+    </div>
   </div>
   <div class="hud-mid">
-    <span class="combo" id="duel-combo"></span>
+    <div class="combo idle" id="duel-combo" aria-live="polite">
+      <b id="combo-n">0</b><span>連斬</span>
+      <i class="pips" id="combo-pips"><i></i><i></i><i></i><i></i><i></i></i>
+    </div>
     <button type="button" class="hud-quit" id="duel-quit">投降</button>
   </div>
-  <div class="hp opp">
-    <div class="hp-top"><span id="hp-opp-val">100</span><b id="hp-opp-name">對手</b></div>
-    <div class="hp-bar"><i id="hp-opp-fill"></i></div>
+  <div class="fighter opp">
+    <span class="f-ava" id="opp-ava">敵</span>
+    <div class="f-info">
+      <div class="f-name"><span class="f-hp" id="hp-opp-val">100</span><b id="hp-opp-name">對手</b></div>
+      <div class="hp-bar"><i class="hp-lag" id="hp-opp-lag"></i><i class="hp-fill" id="hp-opp-fill"></i></div>
+      <div class="f-prog"><i id="opp-prog"></i></div>
+    </div>
   </div>
   <p class="hud-note" id="duel-note" hidden></p>
 </div>
+
 
 <main class="wrap">
   <div class="tools">
@@ -211,14 +223,20 @@
 </div>
 <div class="key-pop" id="key-pop" aria-hidden="true" hidden></div>
 <div class="toast" id="toast" role="status" hidden></div>
-<div class="fx-layer" id="fx-layer" aria-hidden="true"></div>
-<svg class="fx-defs" width="0" height="0" aria-hidden="true" focusable="false">
-  <!-- 讓刀氣墨痕邊緣帶點宣紙暈開的毛邊 -->
-  <filter id="ink-rough" x="-5%" y="-20%" width="110%" height="140%">
-    <feTurbulence type="fractalNoise" baseFrequency="0.9 0.05" numOctaves="2" seed="7" result="n"/>
-    <feDisplacementMap in="SourceGraphic" in2="n" scale="1.6" xChannelSelector="R" yChannelSelector="G"/>
-  </filter>
-</svg>
+<div class="duel-stage" id="duel-stage" hidden>
+  <p class="stage-vs" id="stage-vs"></p>
+  <div class="stage-word" id="stage-word"></div>
+  <div class="stage-result" id="stage-result" hidden>
+    <dl class="res-table">
+      <div class="res-row head"><dt></dt><dd id="res-me-name">我</dd><dd id="res-opp-name">對手</dd></div>
+      <div class="res-row"><dt>答對</dt><dd id="res-me-n">0</dd><dd id="res-opp-n">0</dd></div>
+      <div class="res-row"><dt>最高連斬</dt><dd id="res-me-c">0</dd><dd id="res-opp-c">—</dd></div>
+      <div class="res-row"><dt>剩餘血量</dt><dd id="res-me-hp">0</dd><dd id="res-opp-hp">0</dd></div>
+    </dl>
+    <p class="res-note" id="res-note"></p>
+    <button type="button" class="primary-btn wide" id="duel-leave">回到首頁</button>
+  </div>
+</div>
 <div class="hit-flash" id="hit-flash" aria-hidden="true"></div>
 
 <div class="modal" id="settings-modal" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
@@ -309,17 +327,6 @@
       <button type="button" class="ghost-btn wide" id="duel-cancel">取消</button>
     </div>
 
-    <div id="duel-count" hidden>
-      <p class="duel-sub" id="duel-vs"></p>
-      <div class="countdown" id="duel-count-num">3</div>
-    </div>
-
-    <div id="duel-result" hidden>
-      <div class="result-title" id="duel-result-title">勝利</div>
-      <p class="duel-sub" id="duel-result-text"></p>
-      <button type="button" class="primary-btn wide" id="duel-leave">回到首頁</button>
-    </div>
-
     <p class="duel-msg" id="duel-msg" role="alert"></p>
   </div>
 </div>
@@ -327,7 +334,8 @@
 <script src="data/laws.js?v=eda93a4e"></script>
 <script src="data/sounds.js?v=3c6dcebe"></script>
 <script src="assets/app.js?v=cc76d186"></script>
-<script src="assets/duel.js?v=0fe7b16e"></script>
+<script src="assets/fx.js?v=234cc874"></script>
+<script src="assets/duel.js?v=de991b3f"></script>
 <!--/APP-->
 </body>
 </html>

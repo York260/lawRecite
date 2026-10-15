@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 def inline(html):
     css = (ROOT / "assets/style.css").read_text(encoding="utf-8")
     html = re.sub(r'<link rel="stylesheet" href="assets/style\.css(?:\?v=\w+)?">', lambda m: "<style>\n" + css + "</style>", html)
-    for src in ("data/laws.js", "data/sounds.js", "assets/app.js", "assets/duel.js"):
+    for src in ("data/laws.js", "data/sounds.js", "assets/app.js", "assets/fx.js", "assets/duel.js"):
         js = (ROOT / src).read_text(encoding="utf-8").replace("</script", "<\\/script")
         html = re.sub(r'<script src="' + re.escape(src) + r'(?:\?v=\w+)?"></script>', lambda m: "<script>\n" + js + "</script>", html)
     return html

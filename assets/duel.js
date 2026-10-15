@@ -218,10 +218,9 @@
 
   // ---------- 畫面 ----------
   function show(section) {
-    ['duel-lobby', 'duel-wait', 'duel-count', 'duel-result'].forEach(function (id) {
+    ['duel-lobby', 'duel-wait'].forEach(function (id) {
       $(id).hidden = id !== section;
     });
-    $('duel-close').hidden = section === 'duel-count';
     msg('');
   }
   function msg(text) { $('duel-msg').textContent = text || ''; }
@@ -457,31 +456,81 @@
   }
 
   // ---------- 倒數與開打 ----------
+  var FX = window.InkFX;
+  var COUNT_WORDS = ['斬', '壹', '貳', '參'];
+
+  function stageWord(text, cls) {
+    var w = $('stage-word');
+    w.textContent = text;
+    w.className = 'stage-word ' + (cls || '');
+    if (w.animate && !FX.reduced()) {
+      w.animate([
+        { transform: 'scale(2.4) rotate(-4deg)', opacity: 0, filter: 'blur(8px)' },
+        { transform: 'scale(.94) rotate(0deg)', opacity: 1, filter: 'blur(0)', offset: 0.35 },
+        { transform: 'scale(1)', opacity: 1, filter: 'blur(0)' }
+      ], { duration: 420, easing: 'cubic-bezier(.2,.8,.3,1)' });
+    }
+    var r = w.getBoundingClientRect();
+    setTimeout(function () {
+      FX.splatter(r.left + r.width / 2, r.top + r.height / 2, cls === 'go' ? FX.palette().seal : FX.palette().ink, cls === 'go' ? 1.8 : 1);
+    }, 140);
+  }
+
   function countdown(localStart) {
     G.phase = 'count';
-    openModal('duel-count');
-    $('duel-vs').textContent = G.me.name + '　VS　' + G.opp.name;
+    closeModal();
+    var stage = $('duel-stage');
+    stage.hidden = false;
+    stage.className = 'duel-stage counting';
+    $('stage-result').hidden = true;
+    $('stage-vs').innerHTML = '';
+    var a = document.createElement('b'); a.textContent = G.me.name;
+    var v = document.createElement('i'); v.textContent = '對';
+    var b = document.createElement('b'); b.textContent = G.opp.name;
+    $('stage-vs').append(a, v, b);
+    var shown = null;
     var tick = function () {
       var left = Math.ceil((localStart - Date.now()) / 1000);
       if (left <= 0) {
         clearInterval(G.countTimer);
-        play();
+        stageWord('斬', 'go');
+        FX.flash(0.25);
+        setTimeout(function () { if (G && G.phase === 'count') { stage.hidden = true; play(); } }, 520);
         return;
       }
-      $('duel-count-num').textContent = left;
+      var word = COUNT_WORDS[Math.min(3, left)];
+      if (word !== shown) { shown = word; stageWord(word); }
     };
     tick();
-    G.countTimer = setInterval(tick, 100);
+    G.countTimer = setInterval(tick, 80);
+  }
+
+  function setAva(el, name, photo) {
+    el.textContent = '';
+    if (photo) {
+      var img = document.createElement('img');
+      img.src = photo; img.alt = ''; img.referrerPolicy = 'no-referrer';
+      img.onerror = function () { el.textContent = (name || '?').slice(0, 1); };
+      el.appendChild(img);
+    } else {
+      el.textContent = (name || '?').slice(0, 1);
+    }
   }
 
   function play() {
     closeModal();
     G.phase = 'play';
-    G.base = HP / (KO_SHARE * Math.max(1, seqTotal(G.seq, G.cfg)));
+    G.total = Math.max(1, seqTotal(G.seq, G.cfg));
+    G.base = HP / (KO_SHARE * G.total);
+    G.maxStreak = 0;
     $('hp-me-name').textContent = G.me.name;
     $('hp-opp-name').textContent = G.opp.name;
+    var acct = cachedAccount();
+    setAva($('me-ava'), G.me.name, acct && acct.photo);
+    setAva($('opp-ava'), G.opp.name);
     $('duel-note').hidden = true;
     $('duel-hud').hidden = false;
+    renderCombo(0);
     renderHud();
     APP.duelBegin({
       seq: G.seq,
@@ -497,21 +546,19 @@
   // ---------- 本機戰況 ----------
   function onPaint(st) {
     if (!G || G.phase !== 'play') return;
+    var prevD = G.me.d;
+    if (st.w > G.artMaxW) G.artMaxW = st.w;
+    G.me.n = G.doneOk + Math.max(G.artMaxOk, st.ok);
+    G.me.d = Math.min(HP, Math.floor((G.doneW + G.artMaxW) * G.base));
+    if (st.streak > G.maxStreak) G.maxStreak = st.streak;
     if (st.ok > G.artMaxOk) {
       var shots = st.ok - G.artMaxOk;
       G.artMaxOk = st.ok;
-      outgoing(Math.min(shots, 3), st.streak);
-      // 每連對 5 字觸發一次刀氣縱橫
-      var tier = Math.floor(st.streak / 5);
-      if (tier > (G.qiTier || 0)) qiStorm(tier * 5);
-      G.qiTier = tier;
+      outgoing(Math.min(shots, 3), st.streak, G.me.d - prevD);
     } else if (st.streak < 5) {
       G.qiTier = 0;
     }
-    if (st.w > G.artMaxW) G.artMaxW = st.w;
-    G.me.n = G.doneOk + G.artMaxOk;
-    G.me.d = Math.min(HP, Math.floor((G.doneW + G.artMaxW) * G.base));
-    $('duel-combo').textContent = st.streak >= 5 ? '連斬 ' + st.streak + (st.streak > 20 ? ' ×1.5' : st.streak > 10 ? ' ×1.25' : '') : '';
+    renderCombo(st.streak);
     renderHud();
     checkEnd();
   }
@@ -555,14 +602,34 @@
   function myHp() { return Math.max(0, HP - G.opp.d); }
   function oppHp() { return Math.max(0, HP - G.me.d); }
 
+  // HP 以 1000 為單位顯示，讓每一刀都有看得見的傷害數字
   function renderHud() {
     var me = myHp(), op = oppHp();
-    $('hp-me-val').textContent = Math.ceil(me / 10);
-    $('hp-opp-val').textContent = Math.ceil(op / 10);
+    $('hp-me-val').textContent = Math.ceil(me);
+    $('hp-opp-val').textContent = Math.ceil(op);
     $('hp-me-fill').style.width = me / 10 + '%';
     $('hp-opp-fill').style.width = op / 10 + '%';
-    $('hp-me-fill').classList.toggle('low', me < 300);
-    $('hp-opp-fill').classList.toggle('low', op < 300);
+    $('hp-me-lag').style.width = me / 10 + '%';
+    $('hp-opp-lag').style.width = op / 10 + '%';
+    $('duel-hud').classList.toggle('me-low', me < 300);
+    $('duel-hud').classList.toggle('opp-low', op < 300);
+    $('me-prog').style.width = Math.min(100, G.me.n / G.total * 100) + '%';
+    $('opp-prog').style.width = Math.min(100, G.opp.n / G.total * 100) + '%';
+  }
+
+  function renderCombo(streak) {
+    var box = $('duel-combo');
+    var prev = +$('combo-n').textContent;
+    $('combo-n').textContent = streak;
+    box.classList.toggle('hot', streak > 10);
+    box.classList.toggle('blaze', streak > 20);
+    box.classList.toggle('idle', streak === 0);
+    var lit = streak === 0 ? 0 : (streak % 5 === 0 ? 5 : streak % 5);
+    Array.prototype.forEach.call($('combo-pips').children, function (p, i) { p.classList.toggle('on', i < lit); });
+    if (streak > prev && box.animate && !FX.reduced()) {
+      $('combo-n').animate([{ transform: 'scale(1.5)' }, { transform: 'scale(1)' }], { duration: 220, easing: 'cubic-bezier(.2,.8,.3,1)' });
+    }
+    if (streak === 0 && prev >= 5) FX.shake(box, 4);
   }
 
   function checkEnd() {
@@ -592,21 +659,44 @@
     sync();
     G.phase = 'over';
     clearInterval(G.countTimer);
-    var title = { win: '勝利', lose: '落敗', draw: '平手' }[result];
-    $('duel-result-title').textContent = title;
-    $('duel-result-title').className = 'result-title ' + result;
-    $('duel-result-text').textContent = text + '\n你答對 ' + G.me.n + ' 字，剩餘血量 ' + Math.ceil(myHp() / 10) +
-      '；對手答對 ' + G.opp.n + ' 字，剩餘血量 ' + Math.ceil(oppHp() / 10) + '。';
-    openModal('duel-result');
-    if (navigator.vibrate) { try { navigator.vibrate(result === 'win' ? [30, 40, 30] : 120); } catch (e) { /* 不支援 */ } }
-    // 等最後的數字送完，再給對方一點時間讀取，然後清掉房間
+    var ko = (result === 'win' && oppHp() <= 0) || (result === 'lose' && myHp() <= 0);
     var g = G;
+    // 擊倒時先來一記終結一刀，再進結算
+    if (ko) {
+      FX.finisher(result === 'win' ? FX.palette().ink : FX.palette().seal);
+      FX.shake(document.querySelector('.wrap'), 12);
+      FX.shake($('duel-hud'), 8);
+    }
+    setTimeout(function () { showResult(g, result, text); }, ko ? 900 : 200);
+    if (navigator.vibrate) { try { navigator.vibrate(result === 'win' ? [30, 40, 30, 40, 80] : 160); } catch (e) { /* 不支援 */ } }
+    // 等最後的數字送完，再給對方一點時間讀取，然後清掉房間
     var steps = Math.max(Math.ceil((g.me.d - g.sent.d) / MAX_D_STEP), Math.ceil((g.me.n - g.sent.n) / MAX_N_STEP), 0);
     setTimeout(function () {
       clearInterval(g.timer);
       releaseRoom(g);
       if (!G) setTimeout(disconnect, 500);
     }, steps * SYNC_MS + 2500);
+  }
+
+  function showResult(g, result, text) {
+    if (G !== g) return;
+    var stage = $('duel-stage');
+    stage.hidden = false;
+    stage.className = 'duel-stage result ' + result;
+    $('stage-vs').textContent = '';
+    stageWord({ win: '勝', lose: '敗', draw: '和' }[result], result);
+    $('res-me-name').textContent = g.me.name;
+    $('res-opp-name').textContent = g.opp.name;
+    $('res-me-n').textContent = g.me.n + ' 字';
+    $('res-opp-n').textContent = g.opp.n + ' 字';
+    $('res-me-c').textContent = g.maxStreak;
+    $('res-me-hp').textContent = Math.ceil(myHp());
+    $('res-opp-hp').textContent = Math.ceil(oppHp());
+    $('res-note').textContent = text;
+    $('stage-result').hidden = false;
+    if ($('stage-result').animate && !FX.reduced()) {
+      $('stage-result').animate([{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }], { duration: 360, delay: 260, easing: 'ease-out', fill: 'backwards' });
+    }
   }
 
   function releaseRoom(g) {
@@ -630,159 +720,59 @@
     }
     G = null;
     $('duel-hud').hidden = true;
-    $('duel-combo').textContent = '';
+    $('duel-stage').hidden = true;
     if (APP.inDuel()) APP.duelEnd();
   }
 
-  // ---------- 墨色刀芒 ----------
-  // 答對一字，從那個字劈出一道墨色月牙刀芒飛向對手；對手的刀芒是朱墨。
-  // 連對 5、10、15… 字時「刀氣縱橫」：數道墨痕縱橫劈過全畫面。
-  var flying = 0;
-  var SVGNS = 'http://www.w3.org/2000/svg';
-  // 月牙形刀芒，刃口朝前（+x 方向）
-  var CRESCENT = 'M2 30 C 18 6, 52 2, 78 16 C 60 12, 30 16, 14 32 C 30 44, 60 46, 78 44 C 52 56, 18 54, 2 30 Z';
-
+  // ---------- 墨色刀芒（畫在 fx.js 的 canvas 上） ----------
   function center(el) {
     var r = el.getBoundingClientRect();
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   }
-  function makeBlade(kind) {
-    var el = document.createElement('span');
-    el.className = 'blade-proj ' + kind;
-    var svg = document.createElementNS(SVGNS, 'svg');
-    svg.setAttribute('viewBox', '0 0 80 60');
-    var path = document.createElementNS(SVGNS, 'path');
-    path.setAttribute('d', CRESCENT);
-    svg.appendChild(path);
-    el.appendChild(svg);
-    return el;
-  }
-  function slash(from, to, kind, onHit) {
-    if (reduceMotion || flying > 12) { if (onHit) onHit(); return; }
-    var dx = to.x - from.x, dy = to.y - from.y;
-    var ang = Math.atan2(dy, dx) * 180 / Math.PI;
-    var layer = $('fx-layer');
-    // 主刀芒＋兩道殘影
-    [0, 1, 2].forEach(function (k) {
-      var el = makeBlade(kind + (k ? ' ghost' : ''));
-      el.style.left = from.x + 'px';
-      el.style.top = from.y + 'px';
-      layer.appendChild(el);
-      flying++;
-      var anim = el.animate([
-        { transform: 'translate(-50%, -50%) translate(0, 0) rotate(' + ang + 'deg) scale(.4, .7)', opacity: k ? .35 : 1 },
-        { transform: 'translate(-50%, -50%) translate(' + dx * 0.2 + 'px, ' + dy * 0.2 + 'px) rotate(' + ang + 'deg) scale(1.15, 1)', opacity: k ? .3 : 1, offset: 0.25 },
-        { transform: 'translate(-50%, -50%) translate(' + dx + 'px, ' + dy + 'px) rotate(' + ang + 'deg) scale(1, .8)', opacity: k ? 0 : .95 }
-      ], { duration: 380, delay: k * 45, easing: 'cubic-bezier(.5, 0, .2, 1)', fill: 'backwards' });
-      anim.onfinish = function () {
-        el.remove();
-        flying--;
-        if (!k) {
-          splash(to, kind);
-          if (onHit) onHit();
-        }
-      };
-    });
-  }
-  // 命中：墨點四濺
-  function splash(at, kind) {
-    var b = document.createElement('span');
-    b.className = 'ink-splash ' + kind;
-    b.style.left = at.x + 'px';
-    b.style.top = at.y + 'px';
-    $('fx-layer').appendChild(b);
-    b.animate([
-      { transform: 'translate(-50%, -50%) scale(.2) rotate(0deg)', opacity: 1 },
-      { transform: 'translate(-50%, -50%) scale(1.3) rotate(25deg)', opacity: 0 }
-    ], { duration: 360, easing: 'ease-out' }).onfinish = function () { b.remove(); };
+  function hitBar(side, dmg, kind) {
+    var bar = document.querySelector('.fighter.' + side + ' .hp-bar');
+    var r = bar.getBoundingClientRect();
+    var pal = FX.palette();
+    FX.gleam(r, side === 'opp' ? pal.rim : pal.seal);
+    FX.splatter(r.left + r.width * (side === 'opp' ? 0.25 : 0.75), r.top + r.height / 2, side === 'opp' ? pal.ink : pal.seal, 0.7);
+    FX.shake(document.querySelector('.fighter.' + side), 5);
+    if (dmg > 0) FX.damage(r, '-' + dmg, kind);
   }
 
-  // 刀氣縱橫：三道筆鋒縱橫劈過畫面，中央浮現四字
-  var STROKES = [
-    // 起筆粗、收筆尖的墨痕（viewBox 0 0 100 100，拉伸到全螢幕）
-    // 上緣與下緣用不同控制點，中段鼓起、收筆成尖，像毛筆一撇
-    'M-4 15 Q 46 30 104 78 Q 44 50 -4 21 Z',
-    'M104 8 Q 60 40 -4 92 Q 56 58 104 15 Z',
-    'M-4 49 Q 48 41 104 50 Q 48 54 -4 55 Z'
-  ];
-  var stormBusy = false;
-  function qiStorm(streak) {
-    if (stormBusy) return;
-    var layer = $('fx-layer');
-    var storm = document.createElement('div');
-    storm.className = 'qi-storm';
-    var svg = document.createElementNS(SVGNS, 'svg');
-    svg.setAttribute('viewBox', '0 0 100 100');
-    svg.setAttribute('preserveAspectRatio', 'none');
-    STROKES.forEach(function (d) {
-      var p = document.createElementNS(SVGNS, 'path');
-      p.setAttribute('d', d);
-      p.setAttribute('filter', 'url(#ink-rough)');
-      svg.appendChild(p);
-    });
-    storm.appendChild(svg);
-    var word = document.createElement('div');
-    word.className = 'qi-word';
-    word.innerHTML = '<b>刀氣縱橫</b><small>連斬 ' + streak + '</small>';
-    storm.appendChild(word);
-    layer.appendChild(storm);
-    shake(document.querySelector('.hp.opp'));
-    if (reduceMotion) {
-      stormBusy = true;
-      setTimeout(function () { storm.remove(); stormBusy = false; }, 900);
-      return;
-    }
-    stormBusy = true;
-    Array.prototype.forEach.call(svg.childNodes, function (p, k) {
-      p.animate([
-        { clipPath: 'inset(0 100% 0 0)', opacity: 1 },
-        { clipPath: 'inset(0 0 0 0)', opacity: 1, offset: 0.35 },
-        { clipPath: 'inset(0 0 0 0)', opacity: 1, offset: 0.7 },
-        { clipPath: 'inset(0 0 0 0)', opacity: 0 }
-      ], { duration: 900, delay: k * 90, easing: 'cubic-bezier(.6, 0, .2, 1)', fill: 'backwards' });
-    });
-    word.animate([
-      { transform: 'translate(-50%, -50%) scale(1.6)', opacity: 0, letterSpacing: '.6em' },
-      { transform: 'translate(-50%, -50%) scale(1)', opacity: 1, letterSpacing: '.18em', offset: 0.3 },
-      { transform: 'translate(-50%, -50%) scale(1)', opacity: 1, letterSpacing: '.18em', offset: 0.75 },
-      { transform: 'translate(-50%, -50%) scale(.96)', opacity: 0, letterSpacing: '.18em' }
-    ], { duration: 1100, delay: 120, easing: 'ease-out', fill: 'backwards' }).onfinish = function () {
-      storm.remove();
-      stormBusy = false;
-    };
-    if (APP.prefs.vibrate && navigator.vibrate) { try { navigator.vibrate([20, 30, 20, 30, 40]); } catch (e) { /* 不支援 */ } }
-  }
-
-  function shake(el) {
-    el.classList.remove('shake');
-    void el.offsetWidth;
-    el.classList.add('shake');
-  }
-
-  function outgoing(count, streak) {
+  function outgoing(count, streak, dmg) {
     var r = APP.lastCellRect();
     var from = r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : center($('duel-hud'));
-    var to = center(document.querySelector('.hp.opp .hp-bar'));
-    var kind = streak > 20 ? 'ink huge' : streak > 10 ? 'ink big' : 'ink';
+    var to = center(document.querySelector('.fighter.opp .hp-bar'));
+    var pal = FX.palette();
+    var size = streak > 20 ? 26 : streak > 10 ? 21 : 16;
+    var per = Math.max(1, Math.round((dmg || 0) / count));
     for (var i = 0; i < count; i++) {
       (function (k) {
         setTimeout(function () {
-          slash(from, to, kind, function () { shake(document.querySelector('.hp.opp')); });
+          FX.blade(from, to, { size: size, glow: streak > 20 ? 18 : 10, rim: streak > 20 ? pal.brass : pal.rim }, function () {
+            hitBar('opp', dmg ? per : 0, streak > 10 ? 'crit' : '');
+          });
         }, k * 70);
       })(i);
     }
+    // 每連對 5 字觸發一次刀氣縱橫
+    var tier = Math.floor(streak / 5);
+    if (tier > (G.qiTier || 0)) qiStorm(tier * 5);
+    G.qiTier = tier;
   }
 
   function incoming(dd) {
     // 大約一字一道，最多 3 道
     var count = Math.min(3, Math.max(1, Math.round(dd / Math.max(1, G.base))));
-    var from = center(document.querySelector('.hp.opp .hp-bar'));
-    var to = center(document.querySelector('.hp.me .hp-bar'));
+    var from = center(document.querySelector('.fighter.opp .hp-bar'));
+    var to = center(document.querySelector('.fighter.me .hp-bar'));
+    var pal = FX.palette();
+    var per = Math.max(1, Math.round(dd / count));
     for (var i = 0; i < count; i++) {
       (function (k) {
         setTimeout(function () {
-          slash(from, to, 'cinnabar', function () {
-            shake(document.querySelector('.hp.me'));
+          FX.blade(from, to, { color: pal.seal, rim: '#ffd8cc', size: 15 }, function () {
+            hitBar('me', per, 'taken');
             var f = $('hit-flash');
             f.classList.remove('on');
             void f.offsetWidth;
@@ -792,6 +782,33 @@
         }, k * 90);
       })(i);
     }
+  }
+
+  // 刀氣縱橫：三道筆鋒縱橫劈過全畫面，中央蓋上四字與「斬」印
+  var stormBusy = false;
+  function qiStorm(streak) {
+    if (stormBusy) return;
+    stormBusy = true;
+    FX.storm();
+    FX.shake(document.querySelector('.wrap'), 9);
+    FX.shake($('duel-hud'), 6);
+    var word = document.createElement('div');
+    word.className = 'qi-word';
+    word.innerHTML = '<b>刀氣縱橫</b><span class="qi-seal">斬</span><small>連斬 ' + streak + '</small>';
+    document.body.appendChild(word);
+    var done = function () { word.remove(); stormBusy = false; };
+    if (FX.reduced() || !word.animate) { setTimeout(done, 900); return; }
+    word.animate([
+      { transform: 'translate(-50%, -50%) scale(1.9)', opacity: 0, filter: 'blur(10px)' },
+      { transform: 'translate(-50%, -50%) scale(.96)', opacity: 1, filter: 'blur(0)', offset: 0.22 },
+      { transform: 'translate(-50%, -50%) scale(1)', opacity: 1, filter: 'blur(0)', offset: 0.78 },
+      { transform: 'translate(-50%, -50%) scale(1.03)', opacity: 0, filter: 'blur(2px)' }
+    ], { duration: 1150, delay: 140, easing: 'ease-out', fill: 'backwards' }).onfinish = done;
+    word.querySelector('.qi-seal').animate([
+      { transform: 'scale(2.2) rotate(-20deg)', opacity: 0 },
+      { transform: 'scale(1) rotate(-8deg)', opacity: 1 }
+    ], { duration: 220, delay: 420, easing: 'cubic-bezier(.2,.9,.3,1.2)', fill: 'backwards' });
+    if (APP.prefs.vibrate && navigator.vibrate) { try { navigator.vibrate([20, 30, 20, 30, 40]); } catch (e) { /* 不支援 */ } }
   }
 
   // ---------- 分享 ----------
