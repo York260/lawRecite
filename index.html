@@ -47,6 +47,22 @@
   </div>
 </header>
 
+<div class="duel-hud" id="duel-hud" hidden>
+  <div class="hp me">
+    <div class="hp-top"><b id="hp-me-name">我</b><span id="hp-me-val">100</span></div>
+    <div class="hp-bar"><i id="hp-me-fill"></i></div>
+  </div>
+  <div class="hud-mid">
+    <span class="combo" id="duel-combo"></span>
+    <button type="button" class="hud-quit" id="duel-quit">投降</button>
+  </div>
+  <div class="hp opp">
+    <div class="hp-top"><span id="hp-opp-val">100</span><b id="hp-opp-name">對手</b></div>
+    <div class="hp-bar"><i id="hp-opp-fill"></i></div>
+  </div>
+  <p class="hud-note" id="duel-note" hidden></p>
+</div>
+
 <main class="wrap">
   <div class="tools">
     <div class="seg" id="input-seg" role="radiogroup" aria-label="輸入方式">
@@ -61,6 +77,7 @@
       <button type="button" data-d="3" role="radio">多 <small></small></button>
     </div>
     <div class="tool-btns">
+      <button type="button" id="duel-btn" class="ghost-btn duel-btn">對決</button>
       <button type="button" id="review-btn" class="ghost-btn review-btn">複習 0</button>
       <button type="button" id="settings-btn" class="ghost-btn" aria-expanded="false" aria-controls="settings">設定</button>
       <button type="button" id="restart" class="ghost-btn">重來</button>
@@ -158,10 +175,56 @@
 </div>
 <div class="key-pop" id="key-pop" aria-hidden="true" hidden></div>
 <div class="toast" id="toast" role="status" hidden></div>
+<div class="fx-layer" id="fx-layer" aria-hidden="true"></div>
+<div class="hit-flash" id="hit-flash" aria-hidden="true"></div>
+
+<div class="duel-modal" id="duel-modal" hidden role="dialog" aria-modal="true" aria-labelledby="duel-title">
+  <div class="duel-card">
+    <button type="button" class="duel-close" id="duel-close" aria-label="關閉">×</button>
+    <h2 id="duel-title">律刃對決</h2>
+
+    <div id="duel-lobby">
+      <p class="duel-sub">兩人背同一串條文，每答對一字就發一顆火球轟對方，血量先歸零的輸。</p>
+      <label class="field">暱稱
+        <input id="duel-name" maxlength="12" autocomplete="nickname" placeholder="最多 12 字">
+      </label>
+      <p class="duel-cfg" id="duel-cfg"></p>
+      <button type="button" class="primary-btn wide" id="duel-create">建立房間</button>
+      <div class="duel-or">或輸入朋友給的房號</div>
+      <div class="join-row">
+        <input id="duel-code" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="房號" aria-label="房號">
+        <button type="button" class="ghost-btn" id="duel-join">加入</button>
+      </div>
+    </div>
+
+    <div id="duel-wait" hidden>
+      <p class="duel-sub">把房號或邀請連結傳給朋友：</p>
+      <div class="room-code" id="duel-room-code">----</div>
+      <button type="button" class="primary-btn wide" id="duel-share">分享邀請連結</button>
+      <p class="duel-cfg" id="duel-wait-cfg"></p>
+      <p class="duel-status" id="duel-wait-status">等待對手加入…</p>
+      <button type="button" class="ghost-btn wide" id="duel-cancel">取消</button>
+    </div>
+
+    <div id="duel-count" hidden>
+      <p class="duel-sub" id="duel-vs"></p>
+      <div class="countdown" id="duel-count-num">3</div>
+    </div>
+
+    <div id="duel-result" hidden>
+      <div class="result-title" id="duel-result-title">勝利</div>
+      <p class="duel-sub" id="duel-result-text"></p>
+      <button type="button" class="primary-btn wide" id="duel-leave">回到練習</button>
+    </div>
+
+    <p class="duel-msg" id="duel-msg" role="alert"></p>
+  </div>
+</div>
 
 <script src="data/laws.js"></script>
 <script src="data/sounds.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/duel.js"></script>
 <!--/APP-->
 </body>
 </html>

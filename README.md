@@ -46,9 +46,13 @@
 python3 scripts/build_single.py   # 輸出 dist/lawrecite.html
 ```
 
-## 規劃中
+## 雙人對決
 
-- 雙人對決（Firebase）：見 [docs/duel-design.md](docs/duel-design.md)。
+按「對決」→ 輸入暱稱 →「建立房間」，把 4 碼房號或邀請連結傳給朋友，對方按「加入」後倒數 3 秒開打。
+兩人背同一串隨機條文（共約 260 字以上，模式依房主當下設定），每答對一字發一顆火球扣對方血，
+連對第 11 字起傷害 ×1.25、第 21 字起 ×1.5；血量先歸零者輸，都背完則比剩餘血量。
+需從 GitHub Pages 網址開啟（claude.ai 頁面內無法連線）。技術設計見 [docs/duel-design.md](docs/duel-design.md)，
+資料庫安全規則在 [firebase/database.rules.json](firebase/database.rules.json)。
 
 ## 資料
 

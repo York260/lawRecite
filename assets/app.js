@@ -197,6 +197,56 @@
     $('m-bad').textContent = bad;
     $('m-hint').textContent = hint;
     $('m-bar').style.width = (S.order.length ? done / S.order.length * 100 : 100) + '%';
+    if (DUEL && DUEL.onPaint) DUEL.onPaint(duelStats());
+  }
+
+  // ---------- 對決模式的掛勾（實際連線在 duel.js） ----------
+  var DUEL = null;
+  // 這一條目前的戰果：w 為含連擊加成的傷害權重（連對第 11 字起 ×1.25、第 21 字起 ×1.5）
+  function duelStats() {
+    var streak = 0, ok = 0, w = 0;
+    S.order.forEach(function (ci) {
+      var st = S.cells[ci].st;
+      if (st === 'ok') { streak++; ok++; w += streak > 20 ? 1.5 : streak > 10 ? 1.25 : 1; }
+      else if (st) streak = 0;
+    });
+    return { ok: ok, w: w, streak: streak, done: S.done };
+  }
+  function countTypeable(i, mode, density) {
+    var n = 0;
+    law.articles[i].lines.forEach(function (line) {
+      var zs = line.z.split('|');
+      for (var k = 0; k < zs.length; k++) if (isTypeable(zs[k], line.k[k], mode, density)) n++;
+    });
+    return n;
+  }
+  function duelBegin(o) {
+    if (R) endReview();
+    DUEL = o;
+    DUEL.i = 0;
+    DUEL.saved = { mode: prefs.mode, density: prefs.density, art: artIdx };
+    prefs.mode = o.mode;
+    prefs.density = o.density;
+    document.body.classList.add('in-duel');
+    artIdx = o.seq[0];
+    startArticle();
+  }
+  function duelEnd() {
+    if (!DUEL) return;
+    var saved = DUEL.saved;
+    DUEL = null;
+    prefs.mode = saved.mode;
+    prefs.density = saved.density;
+    artIdx = saved.art;
+    document.body.classList.remove('in-duel');
+    fillArticleSelect();
+    startArticle();
+  }
+  function lastCellRect() {
+    if (!S) return null;
+    var i = Math.min(S.pos, S.order.length) - 1;
+    var el = i >= 0 ? S.cells[S.order[i]].el : $('sheet');
+    return el.getBoundingClientRect();
   }
 
   // ---------- 輸入 ----------
@@ -252,6 +302,20 @@
     doneAt = Date.now();
     S.pos = S.order.length;
     paint();
+    if (DUEL) {
+      // 對決中不顯示結算，自動接下一條；不計入個人紀錄與複習
+      var d = DUEL;
+      d.onArticleDone(d.i, duelStats());
+      if (d.i + 1 < d.seq.length) {
+        setTimeout(function () {
+          if (DUEL !== d) return;
+          d.i++;
+          artIdx = d.seq[d.i];
+          startArticle();
+        }, 500);
+      }
+      return;
+    }
     var total = S.order.length, ok = 0, bad = 0, hintN = 0;
     S.order.forEach(function (ci) {
       var st = S.cells[ci].st;
@@ -291,6 +355,8 @@
     if (firstRender) { firstRender = false; window.scrollTo(0, 0); return; }
     var top = document.querySelector('.top');
     var sticky = getComputedStyle(top).position === 'sticky' ? top.offsetHeight : 0;
+    var hud = $('duel-hud');
+    if (hud && !hud.hidden) sticky += hud.offsetHeight;
     var y = $('sheet').getBoundingClientRect().top + window.pageYOffset - sticky - 8;
     window.scrollTo(0, Math.max(0, y));
   }
@@ -369,6 +435,7 @@
     return artIdx === law.articles.length - 1 ? '回到第 ' + law.articles[0].id + ' 條' : '下一條 →';
   }
   function nextArticle() {
+    if (DUEL) return;
     if (R) {
       R.i++;
       if (R.i >= R.queue.length) {
@@ -395,6 +462,7 @@
 
   // 手動換條（上一條、下一條、選單）會離開複習
   function goTo(i) {
+    if (DUEL) return;
     if (R) endReview();
     var n = law.articles.length;
     artIdx = (i + n) % n;
@@ -405,6 +473,8 @@
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function visibleBand() {
     var top = document.querySelector('.top').getBoundingClientRect().bottom + 12;
+    var hud = $('duel-hud');
+    if (hud && !hud.hidden) top = Math.max(top, hud.getBoundingClientRect().bottom + 12);
     var kb = $('kb');
     var bottom = window.innerHeight - (kb.hidden ? 0 : kb.offsetHeight) - 16;
     return { top: top, bottom: bottom };
@@ -670,7 +740,7 @@
 
   // 鍵盤區：完成時顯示「下一條」，否則依輸入方式顯示注音鍵盤或語音列
   function syncPanels() {
-    var done = !!(S && S.done), voice = prefs.input === 'voice';
+    var done = !!(S && S.done) && !DUEL, voice = prefs.input === 'voice';
     $('kb-done').hidden = !done;
     $('kb-keys').hidden = done || voice;
     $('kb-voice').hidden = done || !voice;
@@ -964,4 +1034,16 @@
   }
 
   init();
+
+  // 給 duel.js 用的介面
+  window.LawRecite = {
+    law: function () { return law; },
+    prefs: prefs,
+    countTypeable: countTypeable,
+    lastCellRect: lastCellRect,
+    duelBegin: duelBegin,
+    duelEnd: duelEnd,
+    inDuel: function () { return !!DUEL; },
+    showToast: showToast
+  };
 })();
