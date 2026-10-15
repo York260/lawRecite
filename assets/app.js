@@ -1032,33 +1032,38 @@
     // duel 由 duel.js 處理
   }
   function renderHome() {
-    var seen = 0, perfect = 0;
+    var keys = Object.keys(store.progress), prefix = law.id + ':';
+    var seen = 0, perfect = 0, ticks = $('ticks');
+    ticks.textContent = '';
     law.articles.forEach(function (art) {
-      var best = -1;
-      ['full', 'cloze1', 'cloze2', 'cloze3'].forEach(function (m) {
-        ['', 'v'].forEach(function (v) {
-          var rec = store.progress[law.id + ':' + m + v + ':' + art.id];
-          if (rec) best = Math.max(best, m === 'full' || m === 'cloze3' ? rec.best : rec.best);
-        });
+      var suffix = ':' + art.id, any = false, full = false;
+      keys.forEach(function (k) {
+        if (k.indexOf(prefix) !== 0 || k.slice(-suffix.length) !== suffix) return;
+        any = true;
+        var mode = k.slice(prefix.length, k.length - suffix.length);
+        if ((mode === 'full' || mode === 'fullv') && store.progress[k].best === 100) full = true;
       });
-      if (best >= 0) seen++;
-      var full = store.progress[law.id + ':full:' + art.id] || store.progress[law.id + ':fullv:' + art.id];
-      if (full && full.best === 100) perfect++;
+      if (any) seen++;
+      if (full) perfect++;
+      var t = document.createElement('i');
+      t.className = isDue(art) ? 'due' : full ? 'perfect' : any ? 'seen' : '';
+      t.title = '第 ' + art.id + ' 條';
+      ticks.appendChild(t);
     });
     var due = dueList().length;
     $('st-seen').textContent = seen;
-    $('st-total').textContent = '/ ' + law.articles.length + ' 條';
+    $('st-total').textContent = '／' + law.articles.length;
     $('st-perfect').textContent = perfect;
     $('st-due').textContent = due;
     $('home-due').textContent = due;
     $('home-due').hidden = !due;
     $('home-review').classList.toggle('has-due', due > 0);
-    $('home-review-desc').textContent = due ? '今天有 ' + due + ' 條到期，背完才算數' : '錯過的條文隔 1、3、7 天再考';
+    $('home-review-desc').textContent = due ? '今天有 ' + due + ' 條到期・背完才算數' : '錯過的條文，隔 1、3、7 天再審';
     $('home-law').textContent = law.name;
-    $('home-sub').textContent = law.articles.length + ' 條' + (law.date ? '・' + law.date.replace(/^民國\s*/, '民國 ') + ' 修正' : '');
+    var d = /(\d+)\D+(\d+)\D+(\d+)/.exec(law.date || '');
+    $('home-sub').textContent = (d ? '民國 ' + (+d[1]) + '.' + (+d[2]) + '.' + (+d[3]) + ' 修正・' : '') + '凡 ' + law.articles.length + ' 條';
     var art = law.articles[artIdx];
-    var started = Object.keys(store.progress).length > 0;
-    $('resume-btn').hidden = !started;
+    $('resume-btn').hidden = keys.length === 0;
     $('resume-text').textContent = '第 ' + art.id + ' 條・' + MODE_NAME[prefs.mode];
   }
 

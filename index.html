@@ -27,54 +27,64 @@
       <span class="acct-ava" id="acct-ava">訪</span>
       <span class="acct-text"><b id="acct-name">訪客</b><small id="acct-sub">點此登入</small></span>
     </button>
-    <button type="button" id="theme-btn-home" class="icon-btn theme-btn" aria-label="切換白天／黑夜模式">
+    <div class="home-tools">
+      <button type="button" class="icon-btn" data-go="settings" aria-label="設定" title="設定">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.4 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.4 2.5h4l.4-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" transform="translate(-1 0)"/></svg>
+      </button>
+      <button type="button" id="theme-btn-home" class="icon-btn theme-btn" aria-label="切換白天／黑夜模式">
         <svg class="i-moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M20.7 14.6A8.5 8.5 0 0 1 9.4 3.3a.8.8 0 0 0-1-1A10 10 0 1 0 21.7 15.6a.8.8 0 0 0-1-1Z"/></svg>
         <svg class="i-sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 1.8v2.4M12 19.8v2.4M1.8 12h2.4M19.8 12h2.4M4.8 4.8l1.7 1.7M17.5 17.5l1.7 1.7M4.8 19.2l1.7-1.7M17.5 6.5l1.7-1.7"/></svg>
     </button>
+    </div>
   </div>
 
-  <div class="hero">
-    <div class="seal" aria-hidden="true"><span>律</span><span>刃</span></div>
-    <h1 class="hero-title">律刃</h1>
-    <p class="hero-law"><span id="home-law">警察人員人事條例</span></p>
-    <p class="hero-sub" id="home-sub"></p>
-  </div>
+  <div class="home-stage">
+    <div class="cover">
+      <p class="cover-law" id="home-law">警察人員人事條例</p>
+      <h1 class="cover-title" aria-label="律刃">
+        <span class="cut cut-a" aria-hidden="true">律刃</span>
+        <span class="cut cut-b" aria-hidden="true">律刃</span>
+        <svg class="blade" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <line x1="-20" y1="66" x2="120" y2="34"/>
+        </svg>
+      </h1>
+      <div class="seal" aria-hidden="true"><span>警</span><span>察</span><span>人</span><span>事</span></div>
+      <p class="cover-meta" id="home-sub"></p>
+    </div>
 
-  <dl class="stats">
-    <div><dt>已背過</dt><dd><b id="st-seen">0</b><small id="st-total">/ 52 條</small></dd></div>
-    <div><dt>全對</dt><dd><b id="st-perfect">0</b><small>條</small></dd></div>
-    <div><dt>待複習</dt><dd><b id="st-due">0</b><small>條</small></dd></div>
-  </dl>
+    <div class="console">
+      <div class="ledger">
+        <p class="ledger-line">
+          <span>已背 <b id="st-seen">0</b><small id="st-total">／52</small></span>
+          <span>全對 <b id="st-perfect">0</b></span>
+          <span>待複習 <b id="st-due">0</b></span>
+        </p>
+        <div class="ticks" id="ticks" aria-hidden="true"></div>
+      </div>
 
-  <button type="button" class="resume" id="resume-btn" hidden>
-    <span>繼續上次</span><b id="resume-text"></b><i aria-hidden="true">→</i>
-  </button>
+      <button type="button" class="resume" id="resume-btn" hidden>
+        <span class="resume-k">續</span><b id="resume-text"></b><i aria-hidden="true">→</i>
+      </button>
 
-  <nav class="menu" aria-label="選擇玩法">
-    <button type="button" class="menu-card" data-go="full">
-      <span class="glyph">逐</span>
-      <span class="mc-text"><b>逐字背誦</b><small>整條挖空，每字打第一個注音</small></span>
-      <span class="mc-arrow" aria-hidden="true">›</span>
-    </button>
-    <button type="button" class="menu-card" data-go="cloze">
-      <span class="glyph">填</span>
-      <span class="mc-text"><b>關鍵字填空</b><small>只挖數字、機關、要件等關鍵字</small></span>
-      <span class="mc-arrow" aria-hidden="true">›</span>
-    </button>
-    <button type="button" class="menu-card" data-go="review" id="home-review">
-      <span class="glyph">複</span>
-      <span class="mc-text"><b>今日複習 <em class="badge" id="home-due">0</em></b><small id="home-review-desc">錯過的條文隔 1、3、7 天再考</small></span>
-      <span class="mc-arrow" aria-hidden="true">›</span>
-    </button>
-    <button type="button" class="menu-card duel" data-go="duel" id="duel-btn">
-      <span class="glyph">決</span>
-      <span class="mc-text"><b>雙人對決</b><small>答對一字發一顆火球，血量先歸零者敗</small></span>
-      <span class="mc-arrow" aria-hidden="true">›</span>
-    </button>
-  </nav>
-
-  <div class="home-foot">
-    <button type="button" class="ghost-btn" data-go="settings">設定</button>
+      <nav class="menu" aria-label="選擇玩法">
+        <button type="button" class="plate" data-go="full">
+          <i class="num">壹</i>
+          <span class="plate-text"><b>逐字背誦</b><small>一字一斬・整條默寫，每字打第一個注音</small></span>
+        </button>
+        <button type="button" class="plate" data-go="cloze">
+          <i class="num">貳</i>
+          <span class="plate-text"><b>關鍵字填空</b><small>只斬要害・數字、機關、要件</small></span>
+        </button>
+        <button type="button" class="plate" data-go="review" id="home-review">
+          <i class="num">參</i>
+          <span class="plate-text"><b>今日複習 <em class="badge" id="home-due" hidden>0</em></b><small id="home-review-desc">錯過的條文，隔 1、3、7 天再審</small></span>
+        </button>
+        <button type="button" class="plate duel" data-go="duel" id="duel-btn">
+          <i class="num">肆</i>
+          <span class="plate-text"><b>雙人對決</b><small>答對一字・火球一發，血先盡者敗</small></span>
+        </button>
+      </nav>
+    </div>
   </div>
 </section>
 
@@ -83,7 +93,6 @@
     <div class="brand">
       <button type="button" class="brand-home" id="home-btn" aria-label="回首頁">
         <span class="back-chev" aria-hidden="true">‹</span>
-        <span class="brand-mark" aria-hidden="true">刃</span>
         <span class="brand-text">
           <strong class="app-name">律刃</strong>
           <span class="muted"><span id="law-name">警察人員人事條例</span><span id="law-date"></span></span>
