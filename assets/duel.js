@@ -22,9 +22,10 @@
   var SDK_FILES = ['firebase-app-compat.js', 'firebase-auth-compat.js', 'firebase-database-compat.js'];
 
   var HP = 1000;            // 血量以 1000 為單位計算，顯示時除以 10
-  var MIN_CHARS = 260;      // 一場至少要背的字數（決定每字傷害）
-  var MAX_ART_CHARS = 180;
-  var PERFECT_BONUS = 10;   // 整條全對的額外傷害，以「字」計  // 單條超過這個字數就不抽，讓一場維持在 2～3 分鐘
+  // 篇幅：一場至少要背的字數（也決定每字傷害）
+  var LENGTHS = { short: 160, std: 260, long: 400 };
+  var MAX_ART_CHARS = 180;  // 單條超過這個字數就不抽，避免一條就拖太久
+  var PERFECT_BONUS = 10;   // 整條全對的額外傷害，以「字」計
   var KO_SHARE = 0.75;      // 不靠連擊時，答對總字數的 75% 剛好打空對手
   var SYNC_MS = 250;
   var MAX_D_STEP = 40;      // 與安全規則一致：每次寫入的增量上限
@@ -237,10 +238,9 @@
   }
 
   function openLobby(code) {
-    var p = APP.prefs, acct = cachedAccount();
+    var acct = cachedAccount();
     $('duel-name').value = loadName() || (acct && acct.kind === 'google' ? acct.name.slice(0, 12) : '');
-    $('duel-cfg').textContent = '建立房間會使用你目前的設定，' + modeText({ mode: p.mode, density: p.density }) +
-      '；輸入方式（注音或語音）各自選擇。';
+    renderRoomOpts();
     if (code) $('duel-code').value = code;
     openModal('duel-lobby');
     if (code) msg('確認暱稱後按「加入」');
@@ -283,7 +283,44 @@
       return seed / 4294967296;
     };
   }
-  function buildSeq(cfg) {
+  // ---------- 開房選項 ----------
+  var ROOM_KEY = 'lawRecite.roomOpts';
+  var roomOpts = (function () {
+    var o = null;
+    try { o = JSON.parse(localStorage.getItem(ROOM_KEY)); } catch (e) { /* 無法讀取 */ }
+    o = o || {};
+    return {
+      mode: o.mode === 'cloze' ? 'cloze' : o.mode === 'full' ? 'full' : APP.prefs.mode,
+      density: [1, 2, 3].indexOf(o.density) >= 0 ? o.density : APP.prefs.density,
+      len: LENGTHS[o.len] ? o.len : 'std'
+    };
+  })();
+  function saveRoomOpts() {
+    try { localStorage.setItem(ROOM_KEY, JSON.stringify(roomOpts)); } catch (e) { /* 無法儲存 */ }
+  }
+  function renderRoomOpts() {
+    [['room-mode', 'mode', roomOpts.mode], ['room-density', 'd', String(roomOpts.density)], ['room-len', 'len', roomOpts.len]].forEach(function (g) {
+      Array.prototype.forEach.call($(g[0]).querySelectorAll('button'), function (b) {
+        b.setAttribute('aria-checked', b.dataset[g[1]] === g[2]);
+      });
+    });
+    $('room-density-row').hidden = roomOpts.mode !== 'cloze';
+  }
+  function bindRoomOpts() {
+    [['room-mode', function (b) { roomOpts.mode = b.dataset.mode; }],
+     ['room-density', function (b) { roomOpts.density = +b.dataset.d; }],
+     ['room-len', function (b) { roomOpts.len = b.dataset.len; }]].forEach(function (g) {
+      $(g[0]).addEventListener('click', function (e) {
+        var b = e.target.closest('button');
+        if (!b) return;
+        g[1](b);
+        saveRoomOpts();
+        renderRoomOpts();
+      });
+    });
+  }
+
+  function buildSeq(cfg, minChars) {
     var law = APP.law(), rand = rng(cfg.seed);
     var idx = law.articles.map(function (_, i) { return i; });
     for (var i = idx.length - 1; i > 0; i--) {
@@ -292,7 +329,7 @@
       idx[j] = t;
     }
     var seq = [], total = 0;
-    for (var k = 0; k < idx.length && total < MIN_CHARS; k++) {
+    for (var k = 0; k < idx.length && total < minChars; k++) {
       var c = APP.countTypeable(idx[k], cfg.mode, cfg.density);
       // 太短沒意思，太長會讓一場拖太久（例如第 35 條近 700 字）
       if (c < 8 || c > MAX_ART_CHARS) continue;
@@ -325,9 +362,9 @@
     connect().then(function () { return tryCreate(name, 0); }).catch(fail);
   }
   function tryCreate(name, attempt) {
-    var p = APP.prefs, law = APP.law();
-    var cfg = { law: law.id, mode: p.mode, density: p.density, seed: Math.floor(Math.random() * 1e9) };
-    var seq = buildSeq(cfg);
+    var law = APP.law();
+    var cfg = { law: law.id, mode: roomOpts.mode, density: roomOpts.density, seed: Math.floor(Math.random() * 1e9) };
+    var seq = buildSeq(cfg, LENGTHS[roomOpts.len]);
     cfg.arts = seq.map(function (i) { return law.articles[i].id; }).join(',');
     var code = randomCode();
     var ref = db.ref('rooms/' + code);
@@ -874,6 +911,7 @@
   $('login-guest').addEventListener('click', loginGuest);
   $('logout').addEventListener('click', logout);
   $('duel-create').addEventListener('click', createRoom);
+  bindRoomOpts();
   $('duel-join').addEventListener('click', joinRoom);
   $('duel-code').addEventListener('keydown', function (e) { if (e.key === 'Enter') joinRoom(); });
   $('duel-share').addEventListener('click', share);

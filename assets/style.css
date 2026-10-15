@@ -602,6 +602,13 @@ body.in-duel {
   background: var(--bg); color: var(--ink); font-size: 16px;
 }
 .wide { width: 100%; height: 46px; font-size: 16px; }
+.room-opts { display: grid; gap: 10px; margin: 4px 0 10px; }
+.opt-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.opt-label { width: 2.6em; flex: none; font-size: 13px; color: var(--muted); }
+.room-opts .seg { flex-wrap: wrap; }
+.room-opts .seg button { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.2; padding: 5px 12px; }
+.room-opts .seg button small { font-size: 10px; color: var(--muted); }
+.room-opts .seg button[aria-checked="true"] small { color: inherit; opacity: .8; }
 .duel-or { margin: 16px 0 8px; text-align: center; font-size: 13px; color: var(--muted); }
 .join-row { display: flex; gap: 8px; }
 .join-row input { flex: 1; min-width: 0; text-transform: uppercase; letter-spacing: .3em; font-weight: 700; }

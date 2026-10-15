@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;700;900&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@700&amp;text=%E5%88%80%E6%B0%A3%E7%B8%B1%E6%A9%AB%E5%8F%83%E8%B2%B3%E5%A3%B9%E6%96%AC%E5%8B%9D%E6%95%97%E5%92%8C%E9%80%A30123456789-%2B&amp;display=swap">
-<link rel="stylesheet" href="assets/style.css?v=cf7bf5e5">
+<link rel="stylesheet" href="assets/style.css?v=b5bd04d9">
 </head>
 <body>
 <!--APP-->
@@ -320,7 +320,32 @@
       <label class="field">暱稱
         <input id="duel-name" maxlength="12" autocomplete="nickname" placeholder="最多 12 字">
       </label>
-      <p class="duel-cfg" id="duel-cfg"></p>
+      <div class="room-opts">
+        <div class="opt-row">
+          <span class="opt-label">模式</span>
+          <div class="seg" id="room-mode" role="radiogroup" aria-label="對決模式">
+            <button type="button" role="radio" data-mode="full">逐字背誦</button>
+            <button type="button" role="radio" data-mode="cloze">關鍵字填空</button>
+          </div>
+        </div>
+        <div class="opt-row" id="room-density-row">
+          <span class="opt-label">挖空</span>
+          <div class="seg" id="room-density" role="radiogroup" aria-label="挖空程度">
+            <button type="button" role="radio" data-d="1">少</button>
+            <button type="button" role="radio" data-d="2">中</button>
+            <button type="button" role="radio" data-d="3">多</button>
+          </div>
+        </div>
+        <div class="opt-row">
+          <span class="opt-label">篇幅</span>
+          <div class="seg" id="room-len" role="radiogroup" aria-label="篇幅">
+            <button type="button" role="radio" data-len="short">短<small>約 160 字</small></button>
+            <button type="button" role="radio" data-len="std">標準<small>約 260 字</small></button>
+            <button type="button" role="radio" data-len="long">長<small>約 400 字</small></button>
+          </div>
+        </div>
+      </div>
+      <p class="duel-cfg" id="duel-cfg">加入的人會照你選的模式比賽；輸入方式（注音或語音）各自選。</p>
       <button type="button" class="primary-btn wide" id="duel-create">建立房間</button>
       <div class="duel-or">或輸入朋友給的房號</div>
       <div class="join-row">
@@ -346,7 +371,7 @@
 <script src="data/sounds.js?v=3c6dcebe"></script>
 <script src="assets/app.js?v=c2947e29"></script>
 <script src="assets/fx.js?v=4e1e879a"></script>
-<script src="assets/duel.js?v=5f23f837"></script>
+<script src="assets/duel.js?v=97c15b10"></script>
 <!--/APP-->
 </body>
 </html>
