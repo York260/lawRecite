@@ -54,6 +54,12 @@
             "f": {
               ".validate": "newData.isBoolean()"
             },
+            "s": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 200 && (!data.exists() || (newData.val() >= data.val() && newData.val() <= data.val() + 3))"
+            },
+            "q": {
+              ".validate": "newData.val() === true"
+            },
             "$other": {
               ".validate": false
             }

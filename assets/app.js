@@ -153,6 +153,7 @@
     showHeard('');
     $('chapter').textContent = art.chapter;
     $('art-title').textContent = '第 ' + art.id + ' 條';
+    $('art-name').textContent = art.title || '';
     $('m-total').textContent = order.length;
     $('result').hidden = true;
 
@@ -683,6 +684,11 @@
   }
 
   // ---------- 控制項 ----------
+  // 「第 4 條 官職分立」
+  function artLabel(art) {
+    return '第 ' + art.id + ' 條' + (art.title ? ' ' + art.title : '');
+  }
+
   function fillArticleSelect() {
     var sel = $('art-select');
     sel.textContent = '';
@@ -697,7 +703,7 @@
       var opt = document.createElement('option');
       opt.value = i;
       var rec = store.progress[progressKey(art)];
-      opt.textContent = '第 ' + art.id + ' 條' + (rec ? (rec.best === 100 ? '  ✓' : '  ' + rec.best + '%') : '') +
+      opt.textContent = artLabel(art) + (rec ? (rec.best === 100 ? '  ✓' : '  ' + rec.best + '%') : '') +
         (isDue(art) ? '  ⟳' : '');
       group.appendChild(opt);
     });
@@ -1087,7 +1093,7 @@
       if (full) perfect++;
       var t = document.createElement('i');
       t.className = isDue(art) ? 'due' : full ? 'perfect' : any ? 'seen' : '';
-      t.title = '第 ' + art.id + ' 條';
+      t.title = artLabel(art);
       ticks.appendChild(t);
     });
     var due = dueList().length;
@@ -1104,7 +1110,7 @@
     $('home-sub').textContent = (d ? '民國 ' + (+d[1]) + '.' + (+d[2]) + '.' + (+d[3]) + ' 修正・' : '') + '凡 ' + law.articles.length + ' 條';
     var art = law.articles[artIdx];
     $('resume-btn').hidden = keys.length === 0;
-    $('resume-text').textContent = '第 ' + art.id + ' 條・' + MODE_NAME[prefs.mode];
+    $('resume-text').textContent = artLabel(art) + '・' + MODE_NAME[prefs.mode];
   }
 
   function openSettings() {
@@ -1149,7 +1155,33 @@
     showHome();
   }
 
+  var lastCheck = 0;
   init();
+  checkUpdate();
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') checkUpdate();
+  });
+
+  // 有新版就換到新網址重新載入。LINE 等 App 內建瀏覽器常把舊頁面留很久，只靠快取到期不夠。
+  function checkUpdate() {
+    var meta = document.querySelector('meta[name="build"]');
+    if (!meta || !window.fetch || !/^https?:$/.test(location.protocol)) return;
+    if (DUEL || Date.now() - lastCheck < 60000) return; // 對戰中不打斷
+    lastCheck = Date.now();
+    fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) {
+      return r.ok ? r.json() : null;
+    }).then(function (v) {
+      if (!v || !v.build || v.build === meta.content || DUEL) return;
+      try {
+        if (sessionStorage.getItem('lawRecite.reloadFor') === v.build) return; // 換過一次仍是舊版就不再試
+        sessionStorage.setItem('lawRecite.reloadFor', v.build);
+      } catch (e) { /* 無法記錄就照樣更新 */ }
+      location.replace(location.pathname + '?b=' + v.build + location.hash);
+    }).catch(function () { /* 離線或單檔版 */ });
+  }
+  if (/[?&]b=\w+/.test(location.search)) {
+    try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* 不支援 */ }
+  }
 
   // 給 duel.js 用的介面
   window.LawRecite = {

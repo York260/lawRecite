@@ -30,6 +30,8 @@
   var SYNC_MS = 250;
   var MAX_D_STEP = 40;      // 與安全規則一致：每次寫入的增量上限
   var MAX_N_STEP = 20;
+  var GRACE_MS = 30000;     // 對手斷線後等這麼久還沒回來才判勝
+  var SELF_GRACE_MS = 20000; // 自己斷線超過這麼久，回來時直接判負（比對手的等待短，兩邊才不會都判贏）
   var CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   var NAME_KEY = 'lawRecite.duelName';
 
@@ -209,9 +211,12 @@
     return {
       code: null, slot: null, oppSlot: null, room: null, cfg: null,
       seq: [], base: 1, phase: 'idle',   // idle → wait → count → play → over
-      me: { name: '', d: 0, n: 0, f: false },
-      opp: { name: '對手', d: 0, n: 0, f: false, seen: false },
-      sent: { d: 0, n: 0, f: false },
+      me: { name: '', d: 0, n: 0, f: false, s: 0 },
+      opp: { name: '對手', d: 0, n: 0, f: false, s: 0, seen: false },
+      sent: { d: 0, n: 0, f: false, s: 0 },
+      online: false, offlineAt: 0,       // 自己的連線狀態
+      oppGoneAt: 0, graceTimer: 0,       // 對手斷線的等待
+      rejoinAt: 0, stormUntil: 0,
       doneW: 0, doneOk: 0,               // 已背完條文的累計
       artMaxW: 0, artMaxOk: 0,           // 目前條文看過的最大值（語音暫定結果會回退）
       timer: 0, listeners: [], countTimer: 0
@@ -387,6 +392,7 @@
       $('duel-wait-status').textContent = '等待對手加入…';
       openModal('duel-wait');
       watchOpponent();
+      watchConn();
     }, function (err) {
       if (attempt < 3 && /PERMISSION_DENIED/i.test(err.code || err.message)) return tryCreate(name, attempt + 1);
       throw err;
@@ -428,6 +434,7 @@
         $('duel-wait-status').textContent = '已加入，等待房主開始…';
         openModal('duel-wait');
         watchOpponent();
+        watchConn();
         watchStart();
       });
     }).catch(function (err) {
@@ -452,23 +459,106 @@
       var v = snap.val();
       if (!G) return;
       if (!v) {
-        if (G.opp.seen) opponentLeft();
+        // 對戰中座位消失多半是斷線（伺服器的 onDisconnect 移除了座位），先等對方重連
+        if (G.opp.seen) {
+          if (G.phase === 'play' || G.phase === 'count') oppGone();
+          else opponentLeft();
+        }
         return;
       }
+      if (v.q && (G.phase === 'play' || G.phase === 'count')) {
+        over('win', (v.name || '對手') + ' 認輸離開了。');
+        return;
+      }
+      if (G.oppGoneAt) oppBack();
       var first = !G.opp.seen;
       G.opp.seen = true;
       G.opp.name = v.name || '對手';
       var dd = (v.d || 0) - G.opp.d;
+      var ds = (v.s || 0) - G.opp.s;
       G.opp.d = v.d || 0;
       G.opp.n = v.n || 0;
       G.opp.f = !!v.f;
+      G.opp.s = v.s || 0;
       if (first && G.slot === 'h' && G.phase === 'wait') hostStart();
       if (G.phase === 'play') {
-        if (dd > 0) incoming(dd);
+        // 對手整條全對（s 加一）→ 刀氣縱橫劈過我方；緊接著送來的傷害算在這一擊裡
+        if (ds > 0) { stormIn(dd); G.stormUntil = Date.now() + 1500; }
+        else if (dd > 0) {
+          if (Date.now() < G.stormUntil) hitBar('me', dd, 'taken');
+          else incoming(dd);
+        }
         renderHud();
         checkEnd();
       }
     });
+  }
+
+  // 自己的連線：斷線時提示；重連後重新登記斷線清理，太久才回來就判負
+  function watchConn() {
+    var g = G;
+    on(db.ref('.info/connected'), 'value', function (snap) {
+      if (G !== g) return;
+      var playing = g.phase === 'play' || g.phase === 'count';
+      if (snap.val() === true) {
+        var was = g.offlineAt;
+        g.online = true;
+        g.offlineAt = 0;
+        if (!was || !playing || !g.room) return;
+        if (Date.now() - was > SELF_GRACE_MS) { over('lose', '你斷線太久，這場判負。'); return; }
+        g.room.child('p/' + g.slot).onDisconnect().remove();
+        note('');
+      } else if (g.online) {
+        g.online = false;
+        g.offlineAt = Date.now();
+        if (playing) note('連線中斷，重新連線中…');
+      }
+    });
+    // 斷線期間伺服器把自己的座位移除了 → 用已送出的數字重新入座
+    on(g.room.child('p/' + g.slot), 'value', function (snap) {
+      if (G !== g || snap.exists() || !g.online || !g.room) return;
+      if (g.phase !== 'play' && g.phase !== 'count') return;
+      if (Date.now() - g.rejoinAt < 3000) return; // 寫入被拒時本機會回滾，避免來回重試
+      g.rejoinAt = Date.now();
+      var seat = g.room.child('p/' + g.slot);
+      seat.set({ uid: uid, name: g.me.name, d: g.sent.d, n: g.sent.n, f: g.sent.f }).then(function () {
+        seat.onDisconnect().remove();
+        if (g.sent.s) seat.child('s').set(g.sent.s).catch(noop);
+      }, noop);
+    });
+  }
+  function noop() { /* 下一輪會再送 */ }
+
+  function oppGone() {
+    if (G.oppGoneAt) return;
+    var g = G;
+    g.oppGoneAt = Date.now();
+    var tick = function () {
+      if (G !== g || !g.oppGoneAt || g.phase === 'over') { clearInterval(g.graceTimer); return; }
+      if (!g.online) { g.oppGoneAt = Date.now(); return; } // 自己也斷線時看不到對方，不計時
+      var left = Math.ceil((GRACE_MS - (Date.now() - g.oppGoneAt)) / 1000);
+      if (left <= 0) {
+        clearInterval(g.graceTimer);
+        g.oppGoneAt = 0;
+        over('win', g.opp.name + ' 斷線超過 ' + GRACE_MS / 1000 + ' 秒，判你獲勝。');
+        return;
+      }
+      note(g.opp.name + ' 連線中斷，等待重新連線…（' + left + '）');
+    };
+    g.graceTimer = setInterval(tick, 500);
+    tick();
+  }
+  function oppBack() {
+    clearInterval(G.graceTimer);
+    G.oppGoneAt = 0;
+    note('');
+  }
+
+  // 對戰中的提示列；沒有其他訊息時顯示「已背完、等待對手」
+  function note(text) {
+    if (!text && G && G.me.f && !G.opp.f && G.phase === 'play') text = '你已背完全部條文，等待 ' + G.opp.name + '…';
+    $('duel-note').textContent = text || '';
+    $('duel-note').hidden = !text;
   }
 
   function hostStart() {
@@ -516,6 +606,11 @@
 
   function countdown(localStart) {
     G.phase = 'count';
+    // 開打後房主短暫斷線不再刪掉整個房間（否則兩邊都會以為對方離開），改成只移除自己的座位
+    if (G.slot === 'h' && G.room) {
+      G.room.onDisconnect().cancel();
+      G.room.child('p/h').onDisconnect().remove();
+    }
     closeModal();
     var stage = $('duel-stage');
     stage.hidden = false;
@@ -566,7 +661,7 @@
     var acct = cachedAccount();
     setAva($('me-ava'), G.me.name, acct && acct.photo);
     setAva($('opp-ava'), G.opp.name);
-    $('duel-note').hidden = true;
+    note('');
     $('duel-hud').hidden = false;
     renderCombo(0);
     renderHud();
@@ -611,6 +706,7 @@
     if (st.clean) {
       var before = G.me.d;
       G.doneW += PERFECT_BONUS;
+      G.me.s++;
       G.me.d = Math.min(HP, Math.floor(G.doneW * G.base));
       qiStorm(APP.law().articles[G.seq[i]].id, G.me.d - before);
       renderHud();
@@ -620,10 +716,7 @@
     if (i + 1 >= G.seq.length) {
       G.me.f = true;
       sync();
-      if (G.phase === 'play' && !G.opp.f) {
-        $('duel-note').textContent = '你已背完全部條文，等待 ' + G.opp.name + '…';
-        $('duel-note').hidden = false;
-      }
+      note('');
       checkEnd();
     }
   }
@@ -632,6 +725,11 @@
   function sync(g) {
     g = g || G;
     if (!g || !g.room) return;
+    // 全對次數 s 單獨寫、而且先寫：對手會先看到刀氣縱橫，再收到這一擊的傷害
+    if (g.me.s > g.sent.s) {
+      g.sent.s = g.me.s;
+      g.room.child('p/' + g.slot + '/s').set(g.me.s).catch(noop);
+    }
     var upd = {};
     if (g.me.d > g.sent.d) upd.d = Math.min(g.me.d, g.sent.d + MAX_D_STEP);
     if (g.me.n > g.sent.n) upd.n = Math.min(g.me.n, g.sent.n + MAX_N_STEP);
@@ -644,7 +742,7 @@
     if (upd.d !== undefined) g.sent.d = upd.d;
     if (upd.n !== undefined) g.sent.n = upd.n;
     if (upd.f) g.sent.f = true;
-    g.room.child('p/' + g.slot).update(upd).catch(function () { /* 下一輪會再送最新值 */ });
+    g.room.child('p/' + g.slot).update(upd).catch(noop);
   }
 
   function myHp() { return Math.max(0, HP - G.opp.d); }
@@ -707,6 +805,8 @@
     sync();
     G.phase = 'over';
     clearInterval(G.countTimer);
+    clearInterval(G.graceTimer);
+    $('duel-note').hidden = true;
     var ko = (result === 'win' && oppHp() <= 0) || (result === 'lose' && myHp() <= 0);
     var g = G;
     // 擊倒時先來一記終結一刀，再進結算
@@ -747,10 +847,13 @@
     }
   }
 
-  function releaseRoom(g) {
+  // quit：對戰中途離開，先標記 q 讓對手立刻判勝，不必等斷線寬限
+  function releaseRoom(g, quit) {
     if (!g || !g.room) return;
     g.listeners.forEach(function (off) { off(); });
     g.listeners = [];
+    clearInterval(g.graceTimer);
+    if (quit) g.room.child('p/' + g.slot + '/q').set(true).catch(noop);
     var target = g.slot === 'h' ? g.room : g.room.child('p/' + g.slot);
     target.onDisconnect().cancel();
     target.remove().catch(function () { /* 房間可能已被對方刪除 */ });
@@ -763,7 +866,7 @@
     if (G.phase !== 'over') {
       clearInterval(G.timer);
       clearInterval(G.countTimer);
-      releaseRoom(G);
+      releaseRoom(G, G.phase === 'play' || G.phase === 'count');
       setTimeout(disconnect, 500);
     }
     G = null;
@@ -815,17 +918,18 @@
     }
   }
 
+  // 對手整條全對放出刀氣縱橫：朱紅筆鋒劈過我方畫面
+  function stormIn(dd) {
+    var pal = FX.palette();
+    FX.storm({ color: pal.seal, scale: 0.9 });
+    FX.shake(document.querySelector('.wrap'), 9);
+    FX.shake($('duel-hud'), 7);
+    setTimeout(function () { hitBar('me', dd, 'taken'); }, 300);
+    if (APP.prefs.vibrate && navigator.vibrate) { try { navigator.vibrate([40, 30, 60]); } catch (e) { /* 不支援 */ } }
+  }
+
   function incoming(dd) {
     var pal = FX.palette();
-    // 一次掉很多血＝對手整條全對放出刀氣縱橫（朱紅筆鋒劈過我方畫面）
-    if (dd >= G.base * 7) {
-      FX.storm({ color: pal.seal, scale: 0.9 });
-      FX.shake(document.querySelector('.wrap'), 9);
-      FX.shake($('duel-hud'), 7);
-      setTimeout(function () { hitBar('me', dd, 'taken'); }, 300);
-      if (APP.prefs.vibrate && navigator.vibrate) { try { navigator.vibrate([40, 30, 60]); } catch (e) { /* 不支援 */ } }
-      return;
-    }
     // 大約一字一道，最多 3 道
     var count = Math.min(3, Math.max(1, Math.round(dd / Math.max(1, G.base))));
     var from = center(document.querySelector('.fighter.opp .hp-bar'));
@@ -925,6 +1029,7 @@
   $('duel-quit').addEventListener('click', function () {
     if (!G || G.phase !== 'play') return;
     if ($('duel-quit').dataset.armed) {
+      G.room.child('p/' + G.slot + '/q').set(true).catch(noop);
       over('lose', '你投降了。');
       return;
     }
@@ -936,7 +1041,10 @@
       $('duel-quit').textContent = '投降';
     }, 2500);
   });
-  window.addEventListener('pagehide', function () { if (G) releaseRoom(G); });
+  // 切到別的 App 時頁面可能只是暫停（persisted），之後還會回來，交給斷線寬限處理
+  window.addEventListener('pagehide', function (e) {
+    if (G && !e.persisted) releaseRoom(G, G.phase === 'play' || G.phase === 'count');
+  });
 
   // 從邀請連結進來：#duel-ABCD
   var m = /^#duel-([A-HJ-NP-Z2-9]{4})$/i.exec(location.hash);

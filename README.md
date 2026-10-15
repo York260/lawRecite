@@ -30,6 +30,7 @@
   `Backspace` 退回一字、空白鍵提示、`Enter` 完成後到下一條、`[` `]` 切換上一條／下一條。
 - 多音字（例如「行」ㄒ／ㄏ）任一讀音的注音首都算對。
 - 「打錯要重打」：開啟後打錯會停在原處，打對才前進（那個字仍會留下紅底記錄）。
+- 每條都有中文條名（例如第 4 條「官職分立」），顯示在條文標題下與條文選單裡；名稱定義在 `scripts/titles.py`，其中標「筆記」的取自學長筆記。
 - 每條的最佳正確率會記在瀏覽器裡，條文選單上會顯示 ✓ 或百分比。
 - **間隔複習**：背完一條若有打錯或用了提示，會自動排入複習，隔 1 天、3 天、7 天各複習一次；
   每次都要全對才進到下一階段，又錯就從 1 天重來，7 天那次也全對即視為熟記。
@@ -54,6 +55,7 @@ python3 scripts/build_single.py   # 輸出 dist/lawrecite.html
 兩人背同一串隨機條文，每答對一字從自己的血條劈出一道墨色刀芒砍向對方血條；每連對第 5、10、15… 字是朱紅刀氣，該字傷害 ×2；
 整條全對觸發「刀氣縱橫」全畫面特效並額外造成 10 字份的傷害；連對第 11 字起傷害 ×1.25、第 21 字起 ×1.5；血量先歸零者輸，都背完則比剩餘血量。
 對決中可隨時在條文卡片上方切換「注音／語音」，不會重來、保留進度與連斬。
+對戰中有人短暫斷線（切 App、關螢幕、換網路）會等 30 秒讓他重連；斷線超過時限判負，按投降則對手立即獲勝。
 需從 GitHub Pages 網址開啟（claude.ai 頁面內無法連線），且 Firebase 後台要啟用 Google 與匿名兩種登入方式。技術設計見 [docs/duel-design.md](docs/duel-design.md)，
 資料庫安全規則在 [firebase/database.rules.json](firebase/database.rules.json)。
 
@@ -64,8 +66,8 @@ python3 scripts/build_single.py   # 輸出 dist/lawrecite.html
 - `scripts/build_data.py`：解析條文、以 [pypinyin](https://github.com/mozillazg/python-pinyin) 計算每個字的注音首，
   並套用關鍵字等級，輸出 `data/laws.js`；另輸出語音模式用的同音字表 `data/sounds.js`（Big5 常用字＋條文用字）。
 
-修改任何 CSS／JS／資料後，執行 `python3 scripts/stamp_assets.py` 更新 `index.html` 裡的版本號（`?v=…`），
-避免瀏覽器拿到「新頁面配舊樣式」的快取。
+修改任何 CSS／JS／資料後，執行 `python3 scripts/stamp_assets.py` 更新 `index.html` 裡的版本號（`?v=…`）與 `version.json`，
+避免瀏覽器拿到「新頁面配舊樣式」的快取。網頁開啟或切回前景時會比對 `version.json`，發現自己是舊版就自動換新（對戰中不打斷）。
 
 修改詞表或新增法規後重新產生資料：
 

@@ -16,6 +16,7 @@ from pathlib import Path
 from pypinyin import Style, pinyin
 
 from keywords import LEVELS, PATTERNS
+from titles import TITLES
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = [
@@ -163,6 +164,12 @@ def main():
     laws = []
     for src in SOURCES:
         meta, articles = parse(src["file"])
+        titles = TITLES.get(src["id"], {})
+        for art in articles:
+            art["title"] = titles.get(art["id"], "")
+        missing = [a["id"] for a in articles if not a["title"]]
+        if missing:
+            print(f"注意：{src['id']} 第 {'、'.join(missing)} 條沒有條名")
         laws.append({
             "id": src["id"],
             "name": meta.get("法規名稱", src["id"]),

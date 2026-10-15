@@ -231,7 +231,9 @@ button { cursor: pointer; }
 }
 .eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--muted); }
 h1 { margin: 2px 0 0; font: 700 26px/1.2 var(--font-law); letter-spacing: .04em; text-wrap: balance; }
-.meter { min-width: 132px; text-align: right; font-variant-numeric: tabular-nums; }
+.art-name { display: block; margin-top: 4px; font-size: .72em; letter-spacing: .06em; color: var(--seal); }
+.art-name:empty { display: none; }
+.meter { min-width: 132px; flex-shrink: 0; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
 .meter-nums { font-size: 18px; font-weight: 700; }
 .meter-sub { font-size: 12px; color: var(--muted); display: flex; justify-content: flex-end; align-items: center; gap: 4px; }
 .dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-left: 6px; }
