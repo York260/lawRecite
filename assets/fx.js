@@ -319,15 +319,18 @@
   }
 
   // ---------- 刀氣縱橫：三道筆鋒＋閃光＋震動 ----------
-  function storm() {
+  // opt.color：筆墨顏色（預設墨色）；opt.scale：筆鋒粗細倍率
+  function storm(opt) {
     if (reduceMotion) return;
     ensure();
-    var pal = palette(), w = W, h = H, m = Math.min(w, h);
-    var thick = Math.max(26, m * 0.075);
-    brushStroke([{ x: -0.05 * w, y: 0.16 * h }, { x: 0.3 * w, y: 0.22 * h }, { x: 0.62 * w, y: 0.52 * h }, { x: 1.05 * w, y: 0.8 * h }], thick, pal.ink, 0, 0.24, 0.42);
-    brushStroke([{ x: 1.05 * w, y: 0.1 * h }, { x: 0.72 * w, y: 0.3 * h }, { x: 0.36 * w, y: 0.62 * h }, { x: -0.05 * w, y: 0.9 * h }], thick * 1.05, pal.ink, 0.09, 0.24, 0.36);
-    brushStroke([{ x: -0.05 * w, y: 0.5 * h }, { x: 0.3 * w, y: 0.44 * h }, { x: 0.7 * w, y: 0.47 * h }, { x: 1.05 * w, y: 0.43 * h }], thick * 0.8, pal.ink, 0.19, 0.2, 0.32);
-    flash(0.28);
+    opt = opt || {};
+    var pal = palette(), w = W, h = H, m = Math.min(w, h), ink = opt.color || pal.ink;
+    var thick = Math.max(30, m * 0.09) * (opt.scale || 1);
+    brushStroke([{ x: -0.05 * w, y: 0.14 * h }, { x: 0.3 * w, y: 0.2 * h }, { x: 0.62 * w, y: 0.52 * h }, { x: 1.05 * w, y: 0.82 * h }], thick, ink, 0, 0.24, 0.5);
+    brushStroke([{ x: 1.05 * w, y: 0.08 * h }, { x: 0.72 * w, y: 0.3 * h }, { x: 0.36 * w, y: 0.62 * h }, { x: -0.05 * w, y: 0.92 * h }], thick * 1.05, ink, 0.09, 0.24, 0.44);
+    brushStroke([{ x: -0.05 * w, y: 0.5 * h }, { x: 0.3 * w, y: 0.44 * h }, { x: 0.7 * w, y: 0.47 * h }, { x: 1.05 * w, y: 0.43 * h }], thick * 0.85, ink, 0.19, 0.2, 0.4);
+    brushStroke([{ x: 0.5 * w, y: -0.05 * h }, { x: 0.46 * w, y: 0.3 * h }, { x: 0.54 * w, y: 0.7 * h }, { x: 0.48 * w, y: 1.05 * h }], thick * 0.7, ink, 0.28, 0.2, 0.34);
+    flash(0.34);
   }
   // 終結一刀：一道橫貫全螢幕的巨大筆鋒
   function finisher(color) {

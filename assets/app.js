@@ -202,15 +202,20 @@
 
   // ---------- 對決模式的掛勾（實際連線在 duel.js） ----------
   var DUEL = null;
-  // 這一條目前的戰果：w 為含連擊加成的傷害權重（連對第 11 字起 ×1.25、第 21 字起 ×1.5）
+  // 這一條目前的戰果：w 為傷害權重。連對第 11 字起 ×1.25、第 21 字起 ×1.5；
+  // 每連對第 5、10、15… 字是朱紅刀氣，該字傷害再 ×2。clean：整條沒有錯字也沒用提示。
   function duelStats() {
-    var streak = 0, ok = 0, w = 0;
+    var streak = 0, ok = 0, w = 0, clean = true;
     S.order.forEach(function (ci) {
       var st = S.cells[ci].st;
-      if (st === 'ok') { streak++; ok++; w += streak > 20 ? 1.5 : streak > 10 ? 1.25 : 1; }
-      else if (st) streak = 0;
+      if (st === 'ok') {
+        streak++; ok++;
+        var m = streak > 20 ? 1.5 : streak > 10 ? 1.25 : 1;
+        if (streak % 5 === 0) m *= 2;
+        w += m;
+      } else if (st) { streak = 0; clean = false; }
     });
-    return { ok: ok, w: w, streak: streak, done: S.done };
+    return { ok: ok, w: w, streak: streak, done: S.done, clean: clean && ok === S.order.length };
   }
   function countTypeable(i, mode, density) {
     var n = 0;

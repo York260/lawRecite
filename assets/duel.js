@@ -23,7 +23,8 @@
 
   var HP = 1000;            // 血量以 1000 為單位計算，顯示時除以 10
   var MIN_CHARS = 260;      // 一場至少要背的字數（決定每字傷害）
-  var MAX_ART_CHARS = 180;  // 單條超過這個字數就不抽，讓一場維持在 2～3 分鐘
+  var MAX_ART_CHARS = 180;
+  var PERFECT_BONUS = 10;   // 整條全對的額外傷害，以「字」計  // 單條超過這個字數就不抽，讓一場維持在 2～3 分鐘
   var KO_SHARE = 0.75;      // 不靠連擊時，答對總字數的 75% 剛好打空對手
   var SYNC_MS = 250;
   var MAX_D_STEP = 40;      // 與安全規則一致：每次寫入的增量上限
@@ -554,9 +555,9 @@
     if (st.ok > G.artMaxOk) {
       var shots = st.ok - G.artMaxOk;
       G.artMaxOk = st.ok;
-      outgoing(Math.min(shots, 3), st.streak, G.me.d - prevD);
-    } else if (st.streak < 5) {
-      G.qiTier = 0;
+      // 這次新增的字裡是否跨過 5 的倍數 → 朱紅刀氣
+      var red = st.streak >= 5 && Math.floor(st.streak / 5) > Math.floor(Math.max(0, st.streak - shots) / 5);
+      outgoing(Math.min(shots, 3), st.streak, G.me.d - prevD, red);
     }
     renderCombo(st.streak);
     renderHud();
@@ -569,6 +570,16 @@
     G.doneOk += Math.max(st.ok, G.artMaxOk);
     G.artMaxW = 0;
     G.artMaxOk = 0;
+    // 整條全對：刀氣縱橫，額外造成 10 字份的傷害
+    if (st.clean) {
+      var before = G.me.d;
+      G.doneW += PERFECT_BONUS;
+      G.me.d = Math.min(HP, Math.floor(G.doneW * G.base));
+      qiStorm(APP.law().articles[G.seq[i]].id, G.me.d - before);
+      renderHud();
+      checkEnd();
+      if (G.phase !== 'play') return;
+    }
     if (i + 1 >= G.seq.length) {
       G.me.f = true;
       sync();
@@ -739,39 +750,55 @@
     if (dmg > 0) FX.damage(r, '-' + dmg, kind);
   }
 
-  function outgoing(count, streak, dmg) {
-    var r = APP.lastCellRect();
-    var from = r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : center($('duel-hud'));
+  // 刀芒從我方血條出發，往下劃一道弧，砍進對方血條
+  function outgoing(count, streak, dmg, red) {
+    var from = center(document.querySelector('.fighter.me .hp-bar'));
     var to = center(document.querySelector('.fighter.opp .hp-bar'));
     var pal = FX.palette();
-    var size = streak > 20 ? 26 : streak > 10 ? 21 : 16;
+    var size = streak > 20 ? 22 : streak > 10 ? 19 : 16;
     var per = Math.max(1, Math.round((dmg || 0) / count));
     for (var i = 0; i < count; i++) {
       (function (k) {
+        var isRed = red && k === count - 1;
         setTimeout(function () {
-          FX.blade(from, to, { size: size, glow: streak > 20 ? 18 : 10, rim: streak > 20 ? pal.brass : pal.rim }, function () {
-            hitBar('opp', dmg ? per : 0, streak > 10 ? 'crit' : '');
+          var opt = isRed
+            ? { color: pal.seal, rim: pal.brass, size: size + 8, glow: 18, arc: 0.55, duration: 0.46 }
+            : { size: size, glow: streak > 20 ? 14 : 10, rim: streak > 20 ? pal.brass : pal.rim, arc: 0.38 };
+          FX.blade(from, to, opt, function () {
+            hitBar('opp', dmg ? per : 0, isRed ? 'red' : streak > 10 ? 'crit' : '');
+            if (isRed) {
+              var r = document.querySelector('.fighter.opp .hp-bar').getBoundingClientRect();
+              FX.splatter(r.left + r.width * 0.3, r.top + r.height / 2, pal.seal, 1.4);
+              FX.shake($('duel-hud'), 7);
+              if (APP.prefs.vibrate && navigator.vibrate) { try { navigator.vibrate([30, 20, 40]); } catch (e) { /* 不支援 */ } }
+            }
           });
         }, k * 70);
       })(i);
     }
-    // 每連對 5 字觸發一次刀氣縱橫
-    var tier = Math.floor(streak / 5);
-    if (tier > (G.qiTier || 0)) qiStorm(tier * 5);
-    G.qiTier = tier;
   }
 
   function incoming(dd) {
+    var pal = FX.palette();
+    // 一次掉很多血＝對手整條全對放出刀氣縱橫（朱紅筆鋒劈過我方畫面）
+    if (dd >= G.base * 7) {
+      FX.storm({ color: pal.seal, scale: 0.9 });
+      FX.shake(document.querySelector('.wrap'), 9);
+      FX.shake($('duel-hud'), 7);
+      setTimeout(function () { hitBar('me', dd, 'taken'); }, 300);
+      if (APP.prefs.vibrate && navigator.vibrate) { try { navigator.vibrate([40, 30, 60]); } catch (e) { /* 不支援 */ } }
+      return;
+    }
     // 大約一字一道，最多 3 道
     var count = Math.min(3, Math.max(1, Math.round(dd / Math.max(1, G.base))));
     var from = center(document.querySelector('.fighter.opp .hp-bar'));
     var to = center(document.querySelector('.fighter.me .hp-bar'));
-    var pal = FX.palette();
     var per = Math.max(1, Math.round(dd / count));
     for (var i = 0; i < count; i++) {
       (function (k) {
         setTimeout(function () {
-          FX.blade(from, to, { color: pal.seal, rim: '#ffd8cc', size: 15 }, function () {
+          // 對手的刀芒：墨色、朱紅外光，和我方的朱紅刀氣分得開
+          FX.blade(from, to, { rim: pal.seal, size: 15, glow: 12, arc: -0.38 }, function () {
             hitBar('me', per, 'taken');
             var f = $('hit-flash');
             f.classList.remove('on');
@@ -784,31 +811,38 @@
     }
   }
 
-  // 刀氣縱橫：三道筆鋒縱橫劈過全畫面，中央蓋上四字與「斬」印
+  // 刀氣縱橫：整條全對時觸發。四道筆鋒縱橫劈過全畫面，中央蓋上四字與「斬」印
   var stormBusy = false;
-  function qiStorm(streak) {
+  function qiStorm(artId, bonus) {
+    FX.storm({ scale: 1.15 });
+    FX.shake(document.querySelector('.wrap'), 12);
+    FX.shake($('duel-hud'), 9);
+    setTimeout(function () {
+      var r = document.querySelector('.fighter.opp .hp-bar').getBoundingClientRect();
+      FX.splatter(r.left + r.width / 2, r.top + r.height / 2, FX.palette().ink, 2);
+      if (bonus > 0) FX.damage(r, '-' + bonus, 'storm');
+      FX.shake(document.querySelector('.fighter.opp'), 9);
+    }, 360);
+    if (APP.prefs.vibrate && navigator.vibrate) { try { navigator.vibrate([30, 30, 30, 30, 60, 40, 120]); } catch (e) { /* 不支援 */ } }
     if (stormBusy) return;
     stormBusy = true;
-    FX.storm();
-    FX.shake(document.querySelector('.wrap'), 9);
-    FX.shake($('duel-hud'), 6);
     var word = document.createElement('div');
     word.className = 'qi-word';
-    word.innerHTML = '<b>刀氣縱橫</b><span class="qi-seal">斬</span><small>連斬 ' + streak + '</small>';
+    word.innerHTML = '<b>刀氣縱橫</b><span class="qi-seal">斬</span><small></small>';
+    word.querySelector('small').textContent = '第 ' + artId + ' 條全對';
     document.body.appendChild(word);
     var done = function () { word.remove(); stormBusy = false; };
-    if (FX.reduced() || !word.animate) { setTimeout(done, 900); return; }
+    if (FX.reduced() || !word.animate) { setTimeout(done, 1100); return; }
     word.animate([
-      { transform: 'translate(-50%, -50%) scale(1.9)', opacity: 0, filter: 'blur(10px)' },
-      { transform: 'translate(-50%, -50%) scale(.96)', opacity: 1, filter: 'blur(0)', offset: 0.22 },
-      { transform: 'translate(-50%, -50%) scale(1)', opacity: 1, filter: 'blur(0)', offset: 0.78 },
+      { transform: 'translate(-50%, -50%) scale(2.1)', opacity: 0, filter: 'blur(12px)' },
+      { transform: 'translate(-50%, -50%) scale(.95)', opacity: 1, filter: 'blur(0)', offset: 0.2 },
+      { transform: 'translate(-50%, -50%) scale(1)', opacity: 1, filter: 'blur(0)', offset: 0.8 },
       { transform: 'translate(-50%, -50%) scale(1.03)', opacity: 0, filter: 'blur(2px)' }
-    ], { duration: 1150, delay: 140, easing: 'ease-out', fill: 'backwards' }).onfinish = done;
+    ], { duration: 1400, delay: 140, easing: 'ease-out', fill: 'backwards' }).onfinish = done;
     word.querySelector('.qi-seal').animate([
-      { transform: 'scale(2.2) rotate(-20deg)', opacity: 0 },
+      { transform: 'scale(2.4) rotate(-20deg)', opacity: 0 },
       { transform: 'scale(1) rotate(-8deg)', opacity: 1 }
-    ], { duration: 220, delay: 420, easing: 'cubic-bezier(.2,.9,.3,1.2)', fill: 'backwards' });
-    if (APP.prefs.vibrate && navigator.vibrate) { try { navigator.vibrate([20, 30, 20, 30, 40]); } catch (e) { /* 不支援 */ } }
+    ], { duration: 220, delay: 440, easing: 'cubic-bezier(.2,.9,.3,1.2)', fill: 'backwards' });
   }
 
   // ---------- 分享 ----------
