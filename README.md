@@ -61,6 +61,9 @@ python3 scripts/build_single.py   # 輸出 dist/lawrecite.html
 - `scripts/build_data.py`：解析條文、以 [pypinyin](https://github.com/mozillazg/python-pinyin) 計算每個字的注音首，
   並套用關鍵字等級，輸出 `data/laws.js`；另輸出語音模式用的同音字表 `data/sounds.js`（Big5 常用字＋條文用字）。
 
+修改任何 CSS／JS／資料後，執行 `python3 scripts/stamp_assets.py` 更新 `index.html` 裡的版本號（`?v=…`），
+避免瀏覽器拿到「新頁面配舊樣式」的快取。
+
 修改詞表或新增法規後重新產生資料：
 
 ```sh
