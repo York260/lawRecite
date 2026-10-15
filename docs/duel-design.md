@@ -71,7 +71,7 @@ rooms/
       {uid}: { name, d, n, f, hp? }   # 只有本人能寫
 ```
 
-## 5. 安全規則重點（`database.rules.json`）
+## 5. 安全規則重點（[`firebase/database.rules.json`](../firebase/database.rules.json)）
 
 - 只能寫自己的玩家節點：`auth.uid === $uid`。
 - `d`、`n` **只能遞增**，且每次增加量有上限（例如一次最多 +12），擋掉直接改成 999 的作弊。
