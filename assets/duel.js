@@ -222,6 +222,7 @@
       rejoinAt: 0, stormUntil: 0,
       nextI: 0, savedAt: 0,              // 下一條要背的位置；上次存進手機的時間
       floorD: 0, floorN: 0, frozen: false, // 接回對戰時：已送出的數字不倒退；已背完就不再加傷害
+      pausedW: 0,                        // 對手斷線期間打的字：照樣前進，但不算傷害
       doneW: 0, doneOk: 0,               // 已背完條文的累計
       artMaxW: 0, artMaxOk: 0,           // 目前條文看過的最大值（語音暫定結果會回退）
       timer: 0, listeners: [], countTimer: 0
@@ -548,7 +549,7 @@
         over('win', g.opp.name + ' 斷線超過 ' + GRACE_MS / 1000 + ' 秒，判你獲勝。');
         return;
       }
-      note(g.opp.name + ' 連線中斷，等待重新連線…（' + left + '）');
+      note(g.opp.name + ' 連線中斷，攻擊暫停，等待重新連線…（' + left + '）');
     };
     g.graceTimer = setInterval(tick, 500);
     tick();
@@ -600,7 +601,7 @@
     try {
       localStorage.setItem(ACTIVE_KEY, JSON.stringify({
         code: G.code, slot: G.slot, name: G.me.name, opp: G.opp.name, uid: uid,
-        i: G.nextI, doneW: G.doneW, doneOk: G.doneOk, sent: G.sent, at: now
+        i: G.nextI, doneW: G.doneW - G.pausedW, doneOk: G.doneOk, sent: G.sent, at: now
       }));
     } catch (e) { /* 無法儲存 */ }
   }
@@ -823,20 +824,28 @@
   function onPaint(st) {
     if (!G || G.phase !== 'play' || G.frozen) return;
     var prevD = G.me.d;
-    if (st.w > G.artMaxW) G.artMaxW = st.w;
+    if (st.w > G.artMaxW) {
+      if (G.oppGoneAt) G.pausedW += st.w - G.artMaxW; // 不趁對手斷線砍人
+      G.artMaxW = st.w;
+    }
     G.me.n = Math.max(G.floorN, G.doneOk + Math.max(G.artMaxOk, st.ok));
-    G.me.d = Math.min(HP, Math.max(G.floorD, Math.floor((G.doneW + G.artMaxW) * G.base)));
+    G.me.d = myDamage(G.artMaxW);
     if (st.streak > G.maxStreak) G.maxStreak = st.streak;
     if (st.ok > G.artMaxOk) {
       var shots = st.ok - G.artMaxOk;
       G.artMaxOk = st.ok;
       // 這次新增的字裡是否跨過 5 的倍數 → 朱紅刀氣
       var red = st.streak >= 5 && Math.floor(st.streak / 5) > Math.floor(Math.max(0, st.streak - shots) / 5);
-      outgoing(Math.min(shots, 3), st.streak, G.me.d - prevD, red);
+      if (!G.oppGoneAt) outgoing(Math.min(shots, 3), st.streak, G.me.d - prevD, red);
     }
     renderCombo(st.streak);
     renderHud();
     checkEnd();
+  }
+
+  // 造成的總傷害：已背完的條文＋目前這條，扣掉對手斷線時打的部分；已送出的數字不倒退
+  function myDamage(artW) {
+    return Math.min(HP, Math.max(G.floorD, Math.floor((G.doneW + artW - G.pausedW) * G.base)));
   }
 
   function onArticleDone(i, st) {
@@ -847,11 +856,11 @@
     G.artMaxW = 0;
     G.artMaxOk = 0;
     // 整條全對：刀氣縱橫，額外造成 10 字份的傷害
-    if (st.clean) {
+    if (st.clean && !G.oppGoneAt) { // 對手斷線中全對也不放刀氣縱橫
       var before = G.me.d;
       G.doneW += PERFECT_BONUS;
       G.me.s++;
-      G.me.d = Math.min(HP, Math.max(G.floorD, Math.floor(G.doneW * G.base)));
+      G.me.d = myDamage(0);
       qiStorm(APP.law().articles[G.seq[i]].id, G.me.d - before);
       renderHud();
       checkEnd();
