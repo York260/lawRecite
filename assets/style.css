@@ -247,6 +247,9 @@ h1 { margin: 2px 0 0; font: 700 26px/1.2 var(--font-law); letter-spacing: .04em;
 .duel-only { display: none !important; }
 .in-duel .duel-only { display: inline-flex !important; }
 .in-duel .practice-only { display: none !important; }
+/* 對決只留條號與輸入切換：章名、字數、對錯統計都不顯示 */
+.in-duel #chapter, .in-duel .meter, .in-duel .sheet-bar { display: none !important; }
+.in-duel .sheet-head { align-items: center; padding-bottom: 8px; margin-bottom: 10px; }
 .peek-btn {
   margin-right: auto; padding: 5px 12px; border-radius: 999px;
   border: 1px solid var(--line); background: var(--surface); color: var(--muted);
@@ -425,7 +428,8 @@ kbd { font: 12px var(--font-ui); border: 1px solid var(--line); border-bottom-wi
 
 /* ---------- 對決 ---------- */
 .in-duel .tools, .in-duel .modes, .in-duel .art-nav, .in-duel #settings, .in-duel .review-bar, .in-duel .howto { display: none !important; }
-.in-duel .wrap { padding-top: 96px; }
+.in-duel .top { display: none; }
+.in-duel .wrap { padding-top: calc(env(safe-area-inset-top, 0px) + 104px); }
 body.in-duel {
   background:
     radial-gradient(60% 40% at 0% 0%, color-mix(in srgb, var(--blade-ink) 10%, transparent), transparent 70%),

@@ -165,6 +165,7 @@
     renderReview();
     scrollToSheet();
     if (!order.length) finish();
+    if (newBuild) setTimeout(applyUpdate, 0);
   }
 
   function paintCell(cell) {
@@ -1081,6 +1082,7 @@
     if (V.on) voiceStop();
     renderHome();
     document.body.classList.add('on-home');
+    if (newBuild) setTimeout(applyUpdate, 0);
     window.scrollTo(0, 0);
   }
   function showPractice(mode) {
@@ -1175,33 +1177,54 @@
     renderReview();
     showLaw();
     startArticle();
-    showHome();
+    var resume = false;
+    try { resume = sessionStorage.getItem('lawRecite.resume') === '1'; sessionStorage.removeItem('lawRecite.resume'); } catch (e) { /* 無法讀取 */ }
+    if (resume) showPractice(); else showHome();
   }
 
-  var lastCheck = 0;
+  var lastCheck = 0, newBuild = null;
   init();
-  checkUpdate();
+  checkUpdate(true);
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible') checkUpdate();
+    if (document.visibilityState === 'visible') checkUpdate(true);
   });
+  window.addEventListener('pageshow', function (e) { if (e.persisted) checkUpdate(true); });
+  window.addEventListener('focus', function () { checkUpdate(); });
+  // 頁面一直開著也會定期檢查（GitHub Pages 部署約需 1 分鐘）
+  setInterval(function () { if (document.visibilityState === 'visible') checkUpdate(); }, 120000);
 
   // 有新版就換到新網址重新載入。LINE 等 App 內建瀏覽器常把舊頁面留很久，只靠快取到期不夠。
-  function checkUpdate() {
+  // force：剛打開或切回畫面時不受一分鐘間隔限制
+  function checkUpdate(force) {
     var meta = document.querySelector('meta[name="build"]');
     if (!meta || !window.fetch || !/^https?:$/.test(location.protocol)) return;
-    if (DUEL || Date.now() - lastCheck < 60000) return; // 對戰中不打斷
+    if (newBuild) { applyUpdate(); return; }
+    if (!force && Date.now() - lastCheck < 60000) return;
     lastCheck = Date.now();
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) {
       return r.ok ? r.json() : null;
     }).then(function (v) {
-      if (!v || !v.build || v.build === meta.content || DUEL) return;
+      if (!v || !v.build || v.build === meta.content) return;
       try {
         if (sessionStorage.getItem('lawRecite.reloadFor') === v.build) return; // 換過一次仍是舊版就不再試
-        sessionStorage.setItem('lawRecite.reloadFor', v.build);
-      } catch (e) { /* 無法記錄就照樣更新 */ }
-      location.replace(location.pathname + '?b=' + v.build + location.hash);
+      } catch (e) { /* 無法讀取 */ }
+      newBuild = v.build;
+      applyUpdate();
     }).catch(function () { /* 離線或單檔版 */ });
   }
+  // 只在不會弄丟進度的時候換新：首頁、條文還沒開始打、或剛背完；否則等到下一個安全時機
+  function applyUpdate() {
+    if (!newBuild || DUEL || document.querySelector('.modal:not([hidden])')) return;
+    var idle = document.body.classList.contains('on-home') || !S || S.done || (S.pos === 0 && !S.cells.some(function (c) { return c.st; }));
+    if (!idle) return;
+    try {
+      sessionStorage.setItem('lawRecite.reloadFor', newBuild);
+      // 更新後回到原本的畫面（練習中就直接回到同一條）
+      if (!document.body.classList.contains('on-home')) sessionStorage.setItem('lawRecite.resume', '1');
+    } catch (e) { /* 無法記錄就照樣更新 */ }
+    location.replace(location.pathname + '?b=' + newBuild + location.hash);
+  }
+
   if (/[?&]b=\w+/.test(location.search)) {
     try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* 不支援 */ }
   }
