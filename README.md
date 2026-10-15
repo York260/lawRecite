@@ -1,6 +1,6 @@
 # 律刃（lawRecite）
 
-用「注音首」背法條的網頁。目前收錄《警察人員人事條例》（民國 114 年 04 月 25 日修正，共 52 條）。
+用「注音首」背法條的網頁遊戲。開啟後是首頁：上方顯示登入身分與戰績，下方選擇逐字背誦、關鍵字填空、今日複習或雙人對決。目前收錄《警察人員人事條例》（民國 114 年 04 月 25 日修正，共 52 條）。
 
 ## 兩種模式
 
@@ -48,10 +48,10 @@ python3 scripts/build_single.py   # 輸出 dist/lawrecite.html
 
 ## 雙人對決
 
-按「對決」→ 輸入暱稱 →「建立房間」，把 4 碼房號或邀請連結傳給朋友，對方按「加入」後倒數 3 秒開打。
+首頁按「雙人對決」→ 用 Google 或訪客身分登入 → 輸入暱稱 →「建立房間」，把 4 碼房號或邀請連結傳給朋友，對方按「加入」後倒數 3 秒開打。
 兩人背同一串隨機條文（共約 260 字以上，模式依房主當下設定），每答對一字發一顆火球扣對方血，
 連對第 11 字起傷害 ×1.25、第 21 字起 ×1.5；血量先歸零者輸，都背完則比剩餘血量。
-需從 GitHub Pages 網址開啟（claude.ai 頁面內無法連線）。技術設計見 [docs/duel-design.md](docs/duel-design.md)，
+需從 GitHub Pages 網址開啟（claude.ai 頁面內無法連線），且 Firebase 後台要啟用 Google 與匿名兩種登入方式。技術設計見 [docs/duel-design.md](docs/duel-design.md)，
 資料庫安全規則在 [firebase/database.rules.json](firebase/database.rules.json)。
 
 ## 資料

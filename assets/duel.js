@@ -23,6 +23,7 @@
 
   var HP = 1000;            // 血量以 1000 為單位計算，顯示時除以 10
   var MIN_CHARS = 260;      // 一場至少要背的字數（決定每字傷害）
+  var MAX_ART_CHARS = 180;  // 單條超過這個字數就不抽，讓一場維持在 2～3 分鐘
   var KO_SHARE = 0.75;      // 不靠連擊時，答對總字數的 75% 剛好打空對手
   var SYNC_MS = 250;
   var MAX_D_STEP = 40;      // 與安全規則一致：每次寫入的增量上限
@@ -45,7 +46,8 @@
       document.head.appendChild(s);
     });
   }
-  function connect() {
+  // 載入 SDK，並等 Firebase 從瀏覽器還原上次的登入狀態；回傳目前使用者（未登入為 null）
+  function loadSdk() {
     if (!sdkPromise) {
       sdkPromise = SDK_FILES.reduce(function (p, f) {
         return p.then(function () { return loadScript(SDK + f); });
@@ -53,19 +55,149 @@
         fb = window.firebase;
         fb.initializeApp(FIREBASE_CONFIG);
         db = fb.database();
+        db.goOffline(); // 真的要對戰才連線，省連線數
+        return new Promise(function (resolve) {
+          var off = fb.auth().onAuthStateChanged(function () { off(); resolve(); });
+        });
       });
       sdkPromise.catch(function () { sdkPromise = null; });
     }
     return sdkPromise.then(function () {
-      db.goOnline();
-      if (fb.auth().currentUser) return fb.auth().currentUser;
-      return fb.auth().signInAnonymously().then(function (c) { return c.user; });
-    }).then(function (user) {
+      var user = fb.auth().currentUser;
+      rememberUser(user);
+      return user;
+    });
+  }
+  // 對戰前呼叫：必須已登入
+  function connect() {
+    return loadSdk().then(function (user) {
+      if (!user) throw { code: 'need-login' };
       uid = user.uid;
+      db.goOnline();
     });
   }
   function disconnect() {
     if (db) db.goOffline();
+  }
+
+  // ---------- 帳號：Google 或訪客 ----------
+  var ACCT_KEY = 'lawRecite.account';
+  var afterLogin = null; // 登入成功後要做的事（例如進入對決大廳）
+
+  function cachedAccount() {
+    try { return JSON.parse(localStorage.getItem(ACCT_KEY)); } catch (e) { return null; }
+  }
+  function rememberUser(user) {
+    var acct = null;
+    if (user) {
+      acct = user.isAnonymous
+        ? { kind: 'guest', name: loadName() || '訪客' }
+        : { kind: 'google', name: user.displayName || (user.email || '').split('@')[0] || '玩家', photo: user.photoURL || '' };
+    }
+    try {
+      if (acct) localStorage.setItem(ACCT_KEY, JSON.stringify(acct));
+      else localStorage.removeItem(ACCT_KEY);
+    } catch (e) { /* 無法儲存 */ }
+    renderAccount();
+  }
+  function renderAccount() {
+    var acct = cachedAccount();
+    var ava = $('acct-ava');
+    ava.textContent = '';
+    ava.className = 'acct-ava';
+    if (acct && acct.photo) {
+      var img = document.createElement('img');
+      img.src = acct.photo;
+      img.alt = '';
+      img.referrerPolicy = 'no-referrer';
+      img.onerror = function () { ava.textContent = acct.name.slice(0, 1); };
+      ava.appendChild(img);
+    } else {
+      ava.textContent = acct ? acct.name.slice(0, 1) : '訪';
+      if (!acct) ava.className += ' empty';
+    }
+    $('acct-name').textContent = acct ? acct.name : '尚未登入';
+    $('acct-sub').textContent = acct ? (acct.kind === 'google' ? 'Google 帳號' : '訪客身分') : '點此登入';
+  }
+
+  function acctMsg(t) { $('acct-msg').textContent = t || ''; }
+  function openAccount(then) {
+    afterLogin = then || null;
+    var acct = cachedAccount();
+    $('acct-out').hidden = !!acct;
+    $('acct-in').hidden = !acct;
+    $('acct-title').textContent = acct ? '帳號' : '登入';
+    if (acct) $('acct-who').textContent = acct.name + '（' + (acct.kind === 'google' ? 'Google' : '訪客') + '）';
+    acctMsg('');
+    loginBusy(false);
+    $('acct-modal').hidden = false;
+  }
+  function closeAccount() { $('acct-modal').hidden = true; afterLogin = null; }
+  function loginBusy(on) {
+    ['login-google', 'login-guest', 'logout'].forEach(function (id) { $(id).disabled = on; });
+  }
+
+  function authError(err) {
+    loginBusy(false);
+    var code = (err && (err.code || err.message)) || '';
+    if (/popup-closed-by-user|cancelled-popup-request/.test(code)) { acctMsg(''); return; }
+    if (/load/.test(code)) acctMsg('無法載入登入元件。請確認網路，並用 GitHub Pages 網址開啟（claude.ai 頁面內無法登入）。');
+    else if (/admin-restricted-operation/.test(code)) acctMsg('訪客登入尚未開放：請到 Firebase 後台 Authentication → 登入方式，啟用「匿名」。');
+    else if (/operation-not-allowed/.test(code)) acctMsg('這個登入方式尚未在 Firebase 後台啟用。');
+    else if (/unauthorized-domain/.test(code)) acctMsg('這個網址尚未加入 Firebase 的授權網域。');
+    else if (/network-request-failed/.test(code)) acctMsg('網路連線失敗，請稍後再試。');
+    else acctMsg('登入失敗：' + code);
+  }
+  function loggedIn(user) {
+    rememberUser(user);
+    loginBusy(false);
+    $('acct-modal').hidden = true;
+    var next = afterLogin;
+    afterLogin = null;
+    if (next) next();
+    else APP.showToast('已登入：' + cachedAccount().name);
+  }
+
+  function loginGoogle() {
+    loginBusy(true);
+    acctMsg('');
+    loadSdk().then(function () {
+      var provider = new fb.auth.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      return fb.auth().signInWithPopup(provider).then(function (c) { return c.user; }, function (err) {
+        // 有些手機瀏覽器擋彈出視窗，改用整頁跳轉
+        if (/popup-blocked|operation-not-supported/.test(err.code || '')) {
+          try { sessionStorage.setItem('lawRecite.redirect', '1'); } catch (e) { /* 無法儲存 */ }
+          return fb.auth().signInWithRedirect(provider).then(function () { return null; });
+        }
+        throw err;
+      });
+    }).then(function (user) { if (user) loggedIn(user); }).catch(authError);
+  }
+  function loginGuest() {
+    loginBusy(true);
+    acctMsg('');
+    loadSdk().then(function () {
+      return fb.auth().signInAnonymously();
+    }).then(function (c) { loggedIn(c.user); }).catch(authError);
+  }
+  function logout() {
+    loginBusy(true);
+    loadSdk().then(function () { return fb.auth().signOut(); }).then(function () {
+      rememberUser(null);
+      closeAccount();
+      APP.showToast('已登出');
+    }).catch(authError);
+  }
+
+  // 按「雙人對決」：先確認登入，再進大廳
+  function startDuelFlow(code) {
+    var go = function () { openLobby(code); };
+    if (!cachedAccount()) { openAccount(go); return; }
+    loadSdk().then(function (user) {
+      if (user) go();
+      else openAccount(go); // 瀏覽器資料被清掉，登入狀態已失效
+    }).catch(function (err) { openAccount(go); authError(err); });
   }
 
   // ---------- 狀態 ----------
@@ -105,12 +237,13 @@
   }
 
   function openLobby(code) {
-    var p = APP.prefs;
-    $('duel-name').value = loadName();
+    var p = APP.prefs, acct = cachedAccount();
+    $('duel-name').value = loadName() || (acct && acct.kind === 'google' ? acct.name.slice(0, 12) : '');
     $('duel-cfg').textContent = '建立房間會使用你目前的設定，' + modeText({ mode: p.mode, density: p.density }) +
       '；輸入方式（注音或語音）各自選擇。';
     if (code) $('duel-code').value = code;
     openModal('duel-lobby');
+    if (code) msg('確認暱稱後按「加入」');
   }
 
   function loadName() {
@@ -137,7 +270,8 @@
     var code = err && (err.code || err.message) || '';
     if (/load/.test(code)) msg('無法載入連線元件。對決需要網路，並請用 GitHub Pages 網址開啟（claude.ai 頁面內無法連線）。');
     else if (/PERMISSION_DENIED|permission/i.test(code)) msg('伺服器拒絕了這個動作，房間可能已滿或已關閉。');
-    else if (/operation-not-allowed/.test(code)) msg('Firebase 尚未啟用匿名登入。');
+    else if (code === 'need-login') { closeModal(); openAccount(function () { openLobby(); }); }
+    else if (/operation-not-allowed|admin-restricted-operation/.test(code)) msg('Firebase 後台尚未啟用這個登入方式。');
     else if (/unauthorized-domain/.test(code)) msg('這個網址尚未加入 Firebase 授權網域。');
     else msg('連線失敗：' + (code || '未知錯誤'));
   }
@@ -160,7 +294,8 @@
     var seq = [], total = 0;
     for (var k = 0; k < idx.length && total < MIN_CHARS; k++) {
       var c = APP.countTypeable(idx[k], cfg.mode, cfg.density);
-      if (c < 8) continue;
+      // 太短沒意思，太長會讓一場拖太久（例如第 35 條近 700 字）
+      if (c < 8 || c > MAX_ART_CHARS) continue;
       seq.push(idx[k]);
       total += c;
     }
@@ -594,13 +729,19 @@
   }
 
   // ---------- 綁定 ----------
-  $('duel-btn').addEventListener('click', function () { openLobby(); });
+  $('duel-btn').addEventListener('click', function () { startDuelFlow(); });
+  $('acct-btn').addEventListener('click', function () { openAccount(); });
+  $('acct-close').addEventListener('click', closeAccount);
+  $('acct-modal').addEventListener('click', function (e) { if (e.target === e.currentTarget) closeAccount(); });
+  $('login-google').addEventListener('click', loginGoogle);
+  $('login-guest').addEventListener('click', loginGuest);
+  $('logout').addEventListener('click', logout);
   $('duel-create').addEventListener('click', createRoom);
   $('duel-join').addEventListener('click', joinRoom);
   $('duel-code').addEventListener('keydown', function (e) { if (e.key === 'Enter') joinRoom(); });
   $('duel-share').addEventListener('click', share);
   $('duel-cancel').addEventListener('click', function () { cleanup(); openLobby(); });
-  $('duel-leave').addEventListener('click', function () { cleanup(); closeModal(); });
+  $('duel-leave').addEventListener('click', function () { cleanup(); closeModal(); APP.showHome(); });
   $('duel-close').addEventListener('click', function () {
     if (G && G.phase === 'over') { cleanup(); }
     else if (G && G.phase === 'wait') { cleanup(); }
@@ -625,8 +766,17 @@
   // 從邀請連結進來：#duel-ABCD
   var m = /^#duel-([A-HJ-NP-Z2-9]{4})$/i.exec(location.hash);
   if (m) {
-    openLobby(m[1].toUpperCase());
-    msg('輸入暱稱後按「加入」');
+    startDuelFlow(m[1].toUpperCase());
     try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* 不支援 */ }
   }
+
+  // Google 整頁跳轉登入回來後，取回結果
+  var redirected = false;
+  try { redirected = sessionStorage.getItem('lawRecite.redirect') === '1'; sessionStorage.removeItem('lawRecite.redirect'); } catch (e) { /* 無法讀取 */ }
+  if (redirected) {
+    loadSdk().then(function () { return fb.auth().getRedirectResult(); }).then(function (r) {
+      if (r && r.user) { rememberUser(r.user); APP.showToast('已登入：' + cachedAccount().name); }
+    }).catch(function (err) { openAccount(); authError(err); });
+  }
+  renderAccount();
 })();

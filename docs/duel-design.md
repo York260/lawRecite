@@ -82,9 +82,10 @@ rooms/
 
 ## 6. 登入
 
-- 使用 **Firebase 匿名登入**：打開就能玩，不用註冊；暱稱存在本機。
-- 之後若要排行榜、跨裝置保存，可升級成 Google 登入（匿名帳號可直接綁定，不會遺失紀錄）。
-- 需在 Firebase 後台把 `york260.github.io` 加入授權網域。
+- 兩種方式：**Google 登入**（彈出視窗，被擋時改整頁跳轉）與**訪客**（Firebase 匿名登入）。
+- 登入狀態由 Firebase 存在瀏覽器；名字與頭像另外快取在 localStorage，首頁不必載入 SDK 就能顯示身分。
+- Firebase 後台需在 Authentication → 登入方式 啟用「Google」與「匿名」，並把 `york260.github.io` 加入授權網域。
+- 未啟用匿名登入時，訪客登入會得到 `auth/admin-restricted-operation`。
 
 ## 7. 配對方式
 

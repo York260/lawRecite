@@ -228,6 +228,7 @@
     prefs.mode = o.mode;
     prefs.density = o.density;
     document.body.classList.add('in-duel');
+    document.body.classList.remove('on-home');
     artIdx = o.seq[0];
     startArticle();
   }
@@ -407,12 +408,6 @@
   }
 
   function renderReview() {
-    var n = dueList().length;
-    var btn = $('review-btn');
-    btn.textContent = R ? '結束複習' : '複習 ' + n;
-    btn.classList.toggle('has-due', !R && n > 0);
-    btn.disabled = !R && n === 0;
-    btn.title = n ? '今天有 ' + n + ' 條要複習' : '今天沒有要複習的條文';
     $('review-bar').hidden = !R;
     if (R) $('review-pos').textContent = '複習中　第 ' + (R.i + 1) + ' / ' + R.queue.length + ' 條';
   }
@@ -878,7 +873,12 @@
     $('kb-again').addEventListener('click', afterDone(startArticle));
     $('r-next').addEventListener('click', afterDone(nextArticle));
     $('kb-next').addEventListener('click', afterDone(nextArticle));
-    $('review-btn').addEventListener('click', function () { if (R) endReview(); else startReview(); });
+    $('review-exit').addEventListener('click', endReview);
+    $('home-btn').addEventListener('click', showHome);
+    Array.prototype.forEach.call(document.querySelectorAll('[data-go]'), function (b) {
+      b.addEventListener('click', function () { go(b.dataset.go); });
+    });
+    $('resume-btn').addEventListener('click', function () { showPractice(); });
     $('density').addEventListener('click', function (e) {
       var b = e.target.closest('button');
       if (!b) return;
@@ -897,11 +897,11 @@
       fillArticleSelect();
       startArticle();
     });
-    $('theme-btn').addEventListener('click', function () {
+    Array.prototype.forEach.call(document.querySelectorAll('.theme-btn'), function (tb) { tb.addEventListener('click', function () {
       prefs.theme = isDark() ? 'light' : 'dark';
       savePrefs();
       applyTheme();
-    });
+    }); });
     $('theme-seg').addEventListener('click', function (e) {
       var b = e.target.closest('button');
       if (!b) return;
@@ -914,11 +914,9 @@
       if (darkQuery.addEventListener) darkQuery.addEventListener('change', onScheme);
       else if (darkQuery.addListener) darkQuery.addListener(onScheme);
     }
-    $('settings-btn').addEventListener('click', function () {
-      var panel = $('settings');
-      panel.hidden = !panel.hidden;
-      $('settings-btn').setAttribute('aria-expanded', !panel.hidden);
-    });
+    $('settings-btn').addEventListener('click', openSettings);
+    $('settings-close').addEventListener('click', closeSettings);
+    $('settings-modal').addEventListener('click', function (e) { if (e.target === e.currentTarget) closeSettings(); });
     $('layout-seg').addEventListener('click', function (e) {
       var b = e.target.closest('button');
       if (!b) return;
@@ -949,6 +947,8 @@
 
     document.addEventListener('keydown', function (e) {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'Escape' && !$('settings-modal').hidden) { closeSettings(); return; }
+      if (document.body.classList.contains('on-home') || document.querySelector('.modal:not([hidden])')) return;
       var t = e.target, tag = (t.tagName || '').toLowerCase();
       if (tag === 'select' || tag === 'textarea' || (tag === 'input' && t.type !== 'checkbox')) return;
       // 焦點在按鈕或勾選框上時，Enter／空白鍵留給它本身
@@ -989,10 +989,11 @@
     var t = prefs.theme === 'light' || prefs.theme === 'dark' ? prefs.theme : hostTheme;
     if (t) root.setAttribute('data-theme', t); else root.removeAttribute('data-theme');
     var dark = isDark();
-    var btn = $('theme-btn');
-    btn.classList.toggle('is-dark', dark);
-    btn.setAttribute('aria-label', dark ? '切換成白天模式' : '切換成黑夜模式');
-    btn.title = btn.getAttribute('aria-label');
+    Array.prototype.forEach.call(document.querySelectorAll('.theme-btn'), function (btn) {
+      btn.classList.toggle('is-dark', dark);
+      btn.setAttribute('aria-label', dark ? '切換成白天模式' : '切換成黑夜模式');
+      btn.title = btn.getAttribute('aria-label');
+    });
     Array.prototype.forEach.call(document.querySelectorAll('#theme-seg button'), function (b) {
       b.setAttribute('aria-checked', b.dataset.themeOpt === prefs.theme);
     });
@@ -1001,6 +1002,74 @@
     var attr = document.documentElement.getAttribute('data-theme');
     if (attr) return attr === 'dark';
     return !!(darkQuery && darkQuery.matches);
+  }
+
+  // ---------- 首頁 ----------
+  var MODE_NAME = { full: '逐字背誦', cloze: '關鍵字填空' };
+  function showHome() {
+    if (DUEL) return;
+    if (R) endReview();
+    if (V.on) voiceStop();
+    renderHome();
+    document.body.classList.add('on-home');
+    window.scrollTo(0, 0);
+  }
+  function showPractice(mode) {
+    if (mode && mode !== prefs.mode) {
+      prefs.mode = mode;
+      fillArticleSelect();
+    }
+    document.body.classList.remove('on-home');
+    startArticle();
+  }
+  function go(where) {
+    if (where === 'full' || where === 'cloze') showPractice(where);
+    else if (where === 'review') {
+      if (!dueList().length) { showToast('今天沒有要複習的條文'); return; }
+      document.body.classList.remove('on-home');
+      startReview();
+    } else if (where === 'settings') openSettings();
+    // duel 由 duel.js 處理
+  }
+  function renderHome() {
+    var seen = 0, perfect = 0;
+    law.articles.forEach(function (art) {
+      var best = -1;
+      ['full', 'cloze1', 'cloze2', 'cloze3'].forEach(function (m) {
+        ['', 'v'].forEach(function (v) {
+          var rec = store.progress[law.id + ':' + m + v + ':' + art.id];
+          if (rec) best = Math.max(best, m === 'full' || m === 'cloze3' ? rec.best : rec.best);
+        });
+      });
+      if (best >= 0) seen++;
+      var full = store.progress[law.id + ':full:' + art.id] || store.progress[law.id + ':fullv:' + art.id];
+      if (full && full.best === 100) perfect++;
+    });
+    var due = dueList().length;
+    $('st-seen').textContent = seen;
+    $('st-total').textContent = '/ ' + law.articles.length + ' 條';
+    $('st-perfect').textContent = perfect;
+    $('st-due').textContent = due;
+    $('home-due').textContent = due;
+    $('home-due').hidden = !due;
+    $('home-review').classList.toggle('has-due', due > 0);
+    $('home-review-desc').textContent = due ? '今天有 ' + due + ' 條到期，背完才算數' : '錯過的條文隔 1、3、7 天再考';
+    $('home-law').textContent = law.name;
+    $('home-sub').textContent = law.articles.length + ' 條' + (law.date ? '・' + law.date.replace(/^民國\s*/, '民國 ') + ' 修正' : '');
+    var art = law.articles[artIdx];
+    var started = Object.keys(store.progress).length > 0;
+    $('resume-btn').hidden = !started;
+    $('resume-text').textContent = '第 ' + art.id + ' 條・' + MODE_NAME[prefs.mode];
+  }
+
+  function openSettings() {
+    syncControls();
+    $('settings-modal').hidden = false;
+    $('settings-close').focus();
+  }
+  function closeSettings() {
+    $('settings-modal').hidden = true;
+    updateKbHeight();
   }
 
   function showLaw() {
@@ -1031,6 +1100,7 @@
     renderReview();
     showLaw();
     startArticle();
+    showHome();
   }
 
   init();
@@ -1044,6 +1114,7 @@
     duelBegin: duelBegin,
     duelEnd: duelEnd,
     inDuel: function () { return !!DUEL; },
+    showHome: showHome,
     showToast: showToast
   };
 })();
