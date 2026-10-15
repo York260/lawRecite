@@ -1,6 +1,6 @@
 // 律刃對決：Firebase Realtime Database 雙人連線
 // 設計重點（詳見 docs/duel-design.md）：
-// - 每位玩家只同步兩個累計數字 d（造成的傷害）與 n（答對字數），火球與血量都在本機計算
+// - 每位玩家只同步兩個累計數字 d（造成的傷害）與 n（答對字數），刀芒特效與血量都在本機計算
 // - 每 250ms 最多寫一次，期間的變化合併成一筆
 // - Firebase SDK 只有按「對決」才載入，結束就斷線
 (function () {
@@ -501,11 +501,17 @@
       var shots = st.ok - G.artMaxOk;
       G.artMaxOk = st.ok;
       outgoing(Math.min(shots, 3), st.streak);
+      // 每連對 5 字觸發一次刀氣縱橫
+      var tier = Math.floor(st.streak / 5);
+      if (tier > (G.qiTier || 0)) qiStorm(tier * 5);
+      G.qiTier = tier;
+    } else if (st.streak < 5) {
+      G.qiTier = 0;
     }
     if (st.w > G.artMaxW) G.artMaxW = st.w;
     G.me.n = G.doneOk + G.artMaxOk;
     G.me.d = Math.min(HP, Math.floor((G.doneW + G.artMaxW) * G.base));
-    $('duel-combo').textContent = st.streak > 20 ? '連擊 ' + st.streak + ' ×1.5' : st.streak > 10 ? '連擊 ' + st.streak + ' ×1.25' : '';
+    $('duel-combo').textContent = st.streak >= 5 ? '連斬 ' + st.streak + (st.streak > 20 ? ' ×1.5' : st.streak > 10 ? ' ×1.25' : '') : '';
     renderHud();
     checkEnd();
   }
@@ -628,45 +634,125 @@
     if (APP.inDuel()) APP.duelEnd();
   }
 
-  // ---------- 火球特效 ----------
+  // ---------- 墨色刀芒 ----------
+  // 答對一字，從那個字劈出一道墨色月牙刀芒飛向對手；對手的刀芒是朱墨。
+  // 連對 5、10、15… 字時「刀氣縱橫」：數道墨痕縱橫劈過全畫面。
   var flying = 0;
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  // 月牙形刀芒，刃口朝前（+x 方向）
+  var CRESCENT = 'M2 30 C 18 6, 52 2, 78 16 C 60 12, 30 16, 14 32 C 30 44, 60 46, 78 44 C 52 56, 18 54, 2 30 Z';
+
   function center(el) {
     var r = el.getBoundingClientRect();
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   }
-  function fireball(from, to, size, onHit) {
-    if (reduceMotion || flying > 10) { if (onHit) onHit(); return; }
-    var ball = document.createElement('span');
-    ball.className = 'fireball ' + size;
-    ball.style.left = from.x + 'px';
-    ball.style.top = from.y + 'px';
-    $('fx-layer').appendChild(ball);
-    flying++;
-    var dx = to.x - from.x, dy = to.y - from.y;
-    var lift = -Math.min(120, Math.abs(dx) * 0.3 + 40);
-    var anim = ball.animate([
-      { transform: 'translate(-50%, -50%) translate(0, 0) scale(.6)', opacity: 1 },
-      { transform: 'translate(-50%, -50%) translate(' + dx * 0.5 + 'px, ' + (dy * 0.5 + lift) + 'px) scale(1.15)', opacity: 1, offset: 0.55 },
-      { transform: 'translate(-50%, -50%) translate(' + dx + 'px, ' + dy + 'px) scale(.9)', opacity: 0.9 }
-    ], { duration: 520, easing: 'cubic-bezier(.3,.1,.5,1)' });
-    anim.onfinish = function () {
-      ball.remove();
-      flying--;
-      burst(to);
-      if (onHit) onHit();
-    };
+  function makeBlade(kind) {
+    var el = document.createElement('span');
+    el.className = 'blade-proj ' + kind;
+    var svg = document.createElementNS(SVGNS, 'svg');
+    svg.setAttribute('viewBox', '0 0 80 60');
+    var path = document.createElementNS(SVGNS, 'path');
+    path.setAttribute('d', CRESCENT);
+    svg.appendChild(path);
+    el.appendChild(svg);
+    return el;
   }
-  function burst(at) {
+  function slash(from, to, kind, onHit) {
+    if (reduceMotion || flying > 12) { if (onHit) onHit(); return; }
+    var dx = to.x - from.x, dy = to.y - from.y;
+    var ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    var layer = $('fx-layer');
+    // 主刀芒＋兩道殘影
+    [0, 1, 2].forEach(function (k) {
+      var el = makeBlade(kind + (k ? ' ghost' : ''));
+      el.style.left = from.x + 'px';
+      el.style.top = from.y + 'px';
+      layer.appendChild(el);
+      flying++;
+      var anim = el.animate([
+        { transform: 'translate(-50%, -50%) translate(0, 0) rotate(' + ang + 'deg) scale(.4, .7)', opacity: k ? .35 : 1 },
+        { transform: 'translate(-50%, -50%) translate(' + dx * 0.2 + 'px, ' + dy * 0.2 + 'px) rotate(' + ang + 'deg) scale(1.15, 1)', opacity: k ? .3 : 1, offset: 0.25 },
+        { transform: 'translate(-50%, -50%) translate(' + dx + 'px, ' + dy + 'px) rotate(' + ang + 'deg) scale(1, .8)', opacity: k ? 0 : .95 }
+      ], { duration: 380, delay: k * 45, easing: 'cubic-bezier(.5, 0, .2, 1)', fill: 'backwards' });
+      anim.onfinish = function () {
+        el.remove();
+        flying--;
+        if (!k) {
+          splash(to, kind);
+          if (onHit) onHit();
+        }
+      };
+    });
+  }
+  // 命中：墨點四濺
+  function splash(at, kind) {
     var b = document.createElement('span');
-    b.className = 'burst';
+    b.className = 'ink-splash ' + kind;
     b.style.left = at.x + 'px';
     b.style.top = at.y + 'px';
     $('fx-layer').appendChild(b);
     b.animate([
-      { transform: 'translate(-50%, -50%) scale(.3)', opacity: 1 },
-      { transform: 'translate(-50%, -50%) scale(1.6)', opacity: 0 }
-    ], { duration: 320, easing: 'ease-out' }).onfinish = function () { b.remove(); };
+      { transform: 'translate(-50%, -50%) scale(.2) rotate(0deg)', opacity: 1 },
+      { transform: 'translate(-50%, -50%) scale(1.3) rotate(25deg)', opacity: 0 }
+    ], { duration: 360, easing: 'ease-out' }).onfinish = function () { b.remove(); };
   }
+
+  // 刀氣縱橫：三道筆鋒縱橫劈過畫面，中央浮現四字
+  var STROKES = [
+    // 起筆粗、收筆尖的墨痕（viewBox 0 0 100 100，拉伸到全螢幕）
+    // 上緣與下緣用不同控制點，中段鼓起、收筆成尖，像毛筆一撇
+    'M-4 15 Q 46 30 104 78 Q 44 50 -4 21 Z',
+    'M104 8 Q 60 40 -4 92 Q 56 58 104 15 Z',
+    'M-4 49 Q 48 41 104 50 Q 48 54 -4 55 Z'
+  ];
+  var stormBusy = false;
+  function qiStorm(streak) {
+    if (stormBusy) return;
+    var layer = $('fx-layer');
+    var storm = document.createElement('div');
+    storm.className = 'qi-storm';
+    var svg = document.createElementNS(SVGNS, 'svg');
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    STROKES.forEach(function (d) {
+      var p = document.createElementNS(SVGNS, 'path');
+      p.setAttribute('d', d);
+      p.setAttribute('filter', 'url(#ink-rough)');
+      svg.appendChild(p);
+    });
+    storm.appendChild(svg);
+    var word = document.createElement('div');
+    word.className = 'qi-word';
+    word.innerHTML = '<b>刀氣縱橫</b><small>連斬 ' + streak + '</small>';
+    storm.appendChild(word);
+    layer.appendChild(storm);
+    shake(document.querySelector('.hp.opp'));
+    if (reduceMotion) {
+      stormBusy = true;
+      setTimeout(function () { storm.remove(); stormBusy = false; }, 900);
+      return;
+    }
+    stormBusy = true;
+    Array.prototype.forEach.call(svg.childNodes, function (p, k) {
+      p.animate([
+        { clipPath: 'inset(0 100% 0 0)', opacity: 1 },
+        { clipPath: 'inset(0 0 0 0)', opacity: 1, offset: 0.35 },
+        { clipPath: 'inset(0 0 0 0)', opacity: 1, offset: 0.7 },
+        { clipPath: 'inset(0 0 0 0)', opacity: 0 }
+      ], { duration: 900, delay: k * 90, easing: 'cubic-bezier(.6, 0, .2, 1)', fill: 'backwards' });
+    });
+    word.animate([
+      { transform: 'translate(-50%, -50%) scale(1.6)', opacity: 0, letterSpacing: '.6em' },
+      { transform: 'translate(-50%, -50%) scale(1)', opacity: 1, letterSpacing: '.18em', offset: 0.3 },
+      { transform: 'translate(-50%, -50%) scale(1)', opacity: 1, letterSpacing: '.18em', offset: 0.75 },
+      { transform: 'translate(-50%, -50%) scale(.96)', opacity: 0, letterSpacing: '.18em' }
+    ], { duration: 1100, delay: 120, easing: 'ease-out', fill: 'backwards' }).onfinish = function () {
+      storm.remove();
+      stormBusy = false;
+    };
+    if (APP.prefs.vibrate && navigator.vibrate) { try { navigator.vibrate([20, 30, 20, 30, 40]); } catch (e) { /* 不支援 */ } }
+  }
+
   function shake(el) {
     el.classList.remove('shake');
     void el.offsetWidth;
@@ -677,25 +763,25 @@
     var r = APP.lastCellRect();
     var from = r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : center($('duel-hud'));
     var to = center(document.querySelector('.hp.opp .hp-bar'));
-    var size = streak > 20 ? 'huge' : streak > 10 ? 'big' : '';
+    var kind = streak > 20 ? 'ink huge' : streak > 10 ? 'ink big' : 'ink';
     for (var i = 0; i < count; i++) {
       (function (k) {
         setTimeout(function () {
-          fireball(from, to, size, function () { shake(document.querySelector('.hp.opp')); });
+          slash(from, to, kind, function () { shake(document.querySelector('.hp.opp')); });
         }, k * 70);
       })(i);
     }
   }
 
   function incoming(dd) {
-    // 大約一字一顆，最多 3 顆
+    // 大約一字一道，最多 3 道
     var count = Math.min(3, Math.max(1, Math.round(dd / Math.max(1, G.base))));
     var from = center(document.querySelector('.hp.opp .hp-bar'));
     var to = center(document.querySelector('.hp.me .hp-bar'));
     for (var i = 0; i < count; i++) {
       (function (k) {
         setTimeout(function () {
-          fireball(from, to, 'enemy', function () {
+          slash(from, to, 'cinnabar', function () {
             shake(document.querySelector('.hp.me'));
             var f = $('hit-flash');
             f.classList.remove('on');
