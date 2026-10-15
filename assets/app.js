@@ -935,8 +935,8 @@
 
   function showLaw() {
     $('law-name').textContent = law.name;
-    $('law-date').textContent = law.date ? '修正日期 ' + law.date : '';
-    document.title = law.name + '背誦';
+    $('law-date').textContent = law.date ? '・' + law.date.replace(/^民國\s*/, '民國') + '修正' : '';
+    document.title = '律刃｜' + law.name;
     fillArticleSelect();
   }
 

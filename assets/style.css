@@ -85,7 +85,8 @@ button { cursor: pointer; }
 }
 .brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
 .brand-text strong { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.brand-text span { font-size: 12px; }
+.brand-text > span { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-text .app-name { font-family: var(--font-law); font-size: 17px; letter-spacing: .12em; }
 .law-select { max-width: 12em; }
 .theme-btn { flex: none; margin-left: auto; display: grid; place-items: center; color: var(--muted); }
 .theme-btn .i-sun { display: none; }
@@ -368,7 +369,7 @@ kbd { font: 12px var(--font-ui); border: 1px solid var(--line); border-bottom-wi
   .top { position: static; }
   .top-inner { gap: 8px; padding-block: 8px; }
   .brand { flex-basis: 100%; }
-  .brand-text span { display: none; }
+  #law-date { display: none; }
   .modes button { padding-inline: 9px; font-size: 14px; }
   .art-nav { flex: 1; min-width: 0; justify-content: flex-end; gap: 4px; }
   .art-nav select { min-width: 0; width: 6.8em; font-size: 14px; padding-inline: 4px; }
