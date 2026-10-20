@@ -80,13 +80,15 @@
     layout: 'dachen',
     keySize: coarse ? 'l' : 'm',
     vibrate: true,
-    samurai: false,    // 武士模式：對決畫面上方改成潑墨武士對砍
+    samurai: true,     // 武士模式：對決畫面上方改成潑墨武士對砍（預設開啟）
     theme: 'auto',
     fontScale: 1,
     peek: false,       // 「原文」：空格裡淡淡顯示原字，給初學者照著打
     kb: coarse,
     art: {}
   }, store.prefs);
+  // 武士模式改成預設開啟：沒有自己切換過的人一律開啟（舊版存下的 false 不算數）
+  if (!prefs.samuraiChosen) prefs.samurai = true;
   if (coarse) prefs.kb = true;
   function savePrefs() { store.prefs = prefs; saveStore(); }
 
@@ -1033,7 +1035,7 @@
       syncControls();
     });
     $('opt-vibrate').addEventListener('change', function (e) { prefs.vibrate = e.target.checked; savePrefs(); });
-    $('opt-samurai').addEventListener('change', function (e) { prefs.samurai = e.target.checked; savePrefs(); e.target.blur(); });
+    $('opt-samurai').addEventListener('change', function (e) { prefs.samurai = e.target.checked; prefs.samuraiChosen = true; savePrefs(); e.target.blur(); });
     $('v-mic').addEventListener('click', function () { if (V.on) voiceStop(); else voiceStart(); });
     $('v-hint').addEventListener('click', hint);
     $('v-back').addEventListener('click', back);
