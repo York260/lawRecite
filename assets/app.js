@@ -27,6 +27,17 @@
         ['ㄈ', 'ㄌ', 'ㄏ', 'ㄒ', 'ㄖ', 'ㄙ', 'ㄩ', 'ㄝ', 'ㄡ', 'ㄥ']
       ]
     },
+    // 同三星手機注音鍵盤：聲調的位置換成「提示」與「⌫」，ㄦ在最下排
+    samsung: {
+      cols: 20,
+      rows: [
+        ['ㄅ', 'ㄉ', 'hint:4', 'ㄓ', 'back:4', 'ㄚ', 'ㄞ', 'ㄢ'],
+        ['ㄆ', 'ㄊ', 'ㄍ', 'ㄐ', 'ㄔ', 'ㄗ', 'ㄧ', 'ㄛ', 'ㄟ', 'ㄣ'],
+        ['ㄇ', 'ㄋ', 'ㄎ', 'ㄑ', 'ㄕ', 'ㄘ', 'ㄨ', 'ㄜ', 'ㄠ', 'ㄤ'],
+        ['ㄈ', 'ㄌ', 'ㄏ', 'ㄒ', 'ㄖ', 'ㄙ', 'ㄩ', 'ㄝ', 'ㄡ', 'ㄥ'],
+        ['gap:12', 'ㄦ']
+      ]
+    },
     // 依注音順序，每列 8 鍵，按鍵較寬
     order: {
       cols: 16,
@@ -192,8 +203,16 @@
     if (cell.el.textContent !== txt) cell.el.textContent = txt;
   }
 
-  // 對決中不能看原文
-  function peeking() { return prefs.peek && !DUEL; }
+  // 對決中不能看原文；電腦按住 Ctrl 也能暫時看原文
+  var ctrlPeek = false;
+  function peeking() { return (prefs.peek || ctrlPeek) && !DUEL; }
+  function setCtrlPeek(on) {
+    if (on === ctrlPeek) return;
+    if (on && (DUEL || document.body.classList.contains('on-home') || document.querySelector('.modal:not([hidden]), .law-tray:not([hidden])'))) return;
+    ctrlPeek = on;
+    if (on && S && !S.done) S.peeked = true;
+    if (S) paint();
+  }
   function setPeek(on) {
     prefs.peek = on;
     savePrefs();
@@ -812,9 +831,14 @@
     $('kb').dataset.size = prefs.keySize;
     layout.rows.forEach(function (row) {
       row.forEach(function (k) {
+        // 「hint:4」表示佔 4 欄；「gap:12」是空位
+        var span = 0, m = /^(\w+):(\d+)$/.exec(k);
+        if (m) { k = m[1]; span = +m[2]; }
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'key';
+        if (span) b.style.gridColumn = 'span ' + span;
+        if (k === 'gap') { b.className += ' gap'; b.tabIndex = -1; b.setAttribute('aria-hidden', 'true'); wrap.appendChild(b); return; }
         if (k === 'hint') { b.className += ' fn'; b.textContent = '提示'; b.dataset.act = 'hint'; }
         else if (k === 'back') { b.className += ' fn'; b.textContent = '⌫'; b.dataset.act = 'back'; b.setAttribute('aria-label', '退回一字'); }
         else {
@@ -1002,12 +1026,23 @@
     $('v-hint').addEventListener('click', hint);
     $('v-back').addEventListener('click', back);
     $('law-select').addEventListener('change', function (e) { setLaw(LAWS[+e.target.value].id); });
-    $('home-law').addEventListener('click', function (e) {
-      var b = e.target.closest('button');
-      if (b) setLaw(b.dataset.law);
+    $('seal-btn').addEventListener('click', openLawTray);
+    $('tray-close').addEventListener('click', closeLawTray);
+    $('law-tray').addEventListener('click', function (e) { if (e.target === e.currentTarget) closeLawTray(); });
+    $('tray-box').addEventListener('click', function (e) {
+      var b = e.target.closest('.pick');
+      if (!b) return;
+      closeLawTray();
+      var id = b.dataset.law;
+      if (id !== law.id) setTimeout(function () { setLaw(id); }, 180);
     });
 
+    // 按住 Ctrl 看原文，放開就收起來
+    document.addEventListener('keydown', function (e) { if (e.key === 'Control' && !e.repeat) setCtrlPeek(true); });
+    document.addEventListener('keyup', function (e) { if (e.key === 'Control') setCtrlPeek(false); });
+    window.addEventListener('blur', function () { setCtrlPeek(false); });
     document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !$('law-tray').hidden) { closeLawTray(); return; }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === 'Escape' && !$('settings-modal').hidden) { closeSettings(); return; }
       if (document.body.classList.contains('on-home') || document.querySelector('.modal:not([hidden])')) return;
@@ -1119,25 +1154,68 @@
     } else if (where === 'settings') openSettings();
     // duel 由 duel.js 處理
   }
-  // 書封左側的直排題簽：每部法規一條，目前的是墨色並垂一條朱紅書籤帶，點別條就換法規
-  function renderSpines() {
-    var box = $('home-law');
-    if (box.children.length !== LAWS.length) {
-      box.textContent = '';
-      LAWS.forEach(function (l) {
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'spine';
-        b.setAttribute('role', 'radio');
-        b.dataset.law = l.id;
-        b.textContent = l.name;
-        if (LAWS.length < 2) b.disabled = true;
-        box.appendChild(b);
-      });
+  // 書封上的朱印：刻目前法規的四字簡稱；有多部法規時會搖，點了打開印譜換法規
+  function fillSeal(el, l) {
+    var chars = (l.seal || '警察人事').split('');
+    el.textContent = '';
+    for (var i = 0; i < 4; i++) {
+      var sp = document.createElement('span');
+      sp.textContent = chars[i] || '';
+      el.appendChild(sp);
     }
-    Array.prototype.forEach.call(box.children, function (b) {
-      b.setAttribute('aria-checked', String(b.dataset.law === law.id));
+  }
+  function renderSeal() {
+    var btn = $('seal-btn');
+    $('home-law').textContent = law.name;
+    fillSeal($('home-seal'), law);
+    btn.disabled = LAWS.length < 2;
+    btn.setAttribute('aria-label', LAWS.length < 2 ? law.name : '換法規（目前：' + law.name + '）');
+    // 用過一次印譜就不再搖
+    btn.classList.toggle('wiggle', LAWS.length > 1 && !prefs.sealUsed && !btn.classList.contains('stamp'));
+  }
+  function openLawTray() {
+    if (LAWS.length < 2) return;
+    if (!prefs.sealUsed) { prefs.sealUsed = true; savePrefs(); $('seal-btn').classList.remove('wiggle'); }
+    var box = $('tray-box'), tray = $('law-tray');
+    box.textContent = '';
+    LAWS.forEach(function (l, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pick';
+      b.dataset.law = l.id;
+      b.style.setProperty('--i', i);
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(l.id === law.id));
+      var sl = document.createElement('span');
+      sl.className = 'seal';
+      sl.setAttribute('aria-hidden', 'true');
+      fillSeal(sl, l);
+      var t = document.createElement('small');
+      t.textContent = l.name;
+      b.append(sl, t);
+      box.appendChild(b);
     });
+    // 一列最多 4 顆（窄螢幕 3 顆），法規少時不留空格
+    var cols = Math.min(LAWS.length, window.innerWidth <= 420 ? 3 : 4);
+    box.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 84px))';
+    tray.hidden = false;
+    // 每顆印都從書封上的那顆印飛出來
+    var sr = $('home-seal').getBoundingClientRect();
+    Array.prototype.forEach.call(box.children, function (b) {
+      var r = b.getBoundingClientRect();
+      b.style.setProperty('--dx', (sr.left + sr.width / 2 - r.left - r.width / 2) + 'px');
+      b.style.setProperty('--dy', (sr.top + sr.height / 2 - r.top - r.height / 2) + 'px');
+    });
+    void tray.offsetWidth;
+    tray.classList.add('open');
+    var sel = box.querySelector('[aria-checked="true"]');
+    if (sel) sel.focus({ preventScroll: true });
+  }
+  function closeLawTray() {
+    var tray = $('law-tray');
+    if (tray.hidden) return;
+    tray.classList.remove('open');
+    setTimeout(function () { if (!tray.classList.contains('open')) tray.hidden = true; }, 200);
   }
 
   function renderHome() {
@@ -1168,9 +1246,7 @@
     $('home-due').hidden = !due;
     $('home-review').classList.toggle('has-due', due > 0);
     $('home-review-desc').textContent = due ? '今天有 ' + due + ' 條到期・背完才算數' : '錯過的條文，隔 1、3、7 天再審';
-    renderSpines();
-    var seal = (law.seal || '警察人事').split('');
-    Array.prototype.forEach.call($('home-seal').children, function (sp, i) { sp.textContent = seal[i] || ''; });
+    renderSeal();
     var d = /(\d+)\D+(\d+)\D+(\d+)/.exec(law.date || '');
     $('home-sub').textContent = (d ? '民國 ' + (+d[1]) + '.' + (+d[2]) + '.' + (+d[3]) + ' 修正・' : '') + '凡 ' + law.articles.length + ' 條';
     var art = law.articles[artIdx];
@@ -1201,15 +1277,12 @@
     startArticle();
     if (document.body.classList.contains('on-home')) {
       renderHome();
-      // 換法規時重新鈐一次印
-      var seal = $('home-seal');
-      if (seal.animate && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
-        seal.animate([
-          { transform: 'rotate(-4deg) scale(1.6)', opacity: 0 },
-          { transform: 'rotate(-4deg) scale(.94)', opacity: 1, offset: 0.7 },
-          { transform: 'rotate(-4deg) scale(1)', opacity: 1 }
-        ], { duration: 320, easing: 'cubic-bezier(.2,.8,.3,1)' });
-      }
+      // 換法規時把新的印蓋回書封，印泥暈開一圈，直排法規名用墨跡淡入
+      var btn = $('seal-btn'), ring = $('seal-ring'), name = $('home-law');
+      btn.classList.remove('wiggle', 'stamp'); ring.classList.remove('go'); name.classList.remove('swap');
+      void btn.offsetWidth;
+      btn.classList.add('stamp'); ring.classList.add('go'); name.classList.add('swap');
+      setTimeout(function () { btn.classList.remove('stamp'); renderSeal(); }, 600);
     }
     return true;
   }

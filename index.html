@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="build" content="f7c1c0d5">
+<meta name="build" content="9683bec7">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>律刃</title>
 <meta name="application-name" content="律刃">
@@ -19,7 +19,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;700;900&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@700&amp;text=%E5%88%80%E6%B0%A3%E7%B8%B1%E6%A9%AB%E5%8F%83%E8%B2%B3%E5%A3%B9%E6%96%AC%E5%8B%9D%E6%95%97%E5%92%8C%E9%80%A30123456789-%2B&amp;display=swap">
-<link rel="stylesheet" href="assets/style.css?v=f21dde85">
+<link rel="stylesheet" href="assets/style.css?v=4ce82c54">
 </head>
 <body>
 <!--APP-->
@@ -42,7 +42,7 @@
 
   <div class="home-stage">
     <div class="cover">
-      <div class="cover-law" id="home-law" role="radiogroup" aria-label="選擇法規"></div>
+      <p class="cover-law" id="home-law">警察人員人事條例</p>
       <h1 class="cover-title" aria-label="律刃">
         <span class="cut cut-a" aria-hidden="true">律刃</span>
         <span class="cut cut-b" aria-hidden="true">律刃</span>
@@ -50,7 +50,10 @@
           <line x1="-20" y1="66" x2="120" y2="34"/>
         </svg>
       </h1>
-      <div class="seal" id="home-seal" aria-hidden="true"><span>警</span><span>察</span><span>人</span><span>事</span></div>
+      <button type="button" class="seal-btn" id="seal-btn" aria-haspopup="dialog" aria-label="換法規">
+        <span class="seal" id="home-seal" aria-hidden="true"><span>警</span><span>察</span><span>人</span><span>事</span></span>
+        <i class="ink-ring" id="seal-ring" aria-hidden="true"></i>
+      </button>
       <p class="cover-meta" id="home-sub"></p>
     </div>
 
@@ -188,7 +191,7 @@
       </div>
     </div>
     <div class="sheet-bar">
-      <button type="button" class="peek-btn practice-only" id="peek-btn" aria-pressed="false" title="在空格裡淡淡顯示原文，照著打（這次不計成績）">原文</button>
+      <button type="button" class="peek-btn practice-only" id="peek-btn" aria-pressed="false" title="在空格裡淡淡顯示原文，照著打（這次不計成績）；電腦可按住 Ctrl 暫時看">原文</button>
     </div>
     <div class="body" id="body"></div>
     <div class="result" id="result" hidden>
@@ -247,6 +250,12 @@
 </div>
 <div class="hit-flash" id="hit-flash" aria-hidden="true"></div>
 
+<div class="law-tray" id="law-tray" hidden role="dialog" aria-modal="true" aria-labelledby="law-tray-title">
+  <h2 id="law-tray-title">印　譜</h2>
+  <div class="tray-box" id="tray-box" role="radiogroup" aria-label="選擇法規"></div>
+  <button type="button" class="link-btn tray-close" id="tray-close">不換了</button>
+</div>
+
 <div class="modal" id="settings-modal" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
   <div class="modal-card">
     <button type="button" class="modal-close" id="settings-close" aria-label="關閉">×</button>
@@ -273,6 +282,7 @@
       <div class="seg" id="layout-seg" role="radiogroup" aria-label="鍵盤排列">
         <button type="button" role="radio" data-layout="dachen">大千（同手機注音）</button>
         <button type="button" role="radio" data-layout="order">ㄅㄆㄇ順序</button>
+        <button type="button" role="radio" data-layout="samsung">三星注音</button>
       </div>
     </div>
     <div class="set-row" id="size-row">
@@ -385,7 +395,7 @@
 
 <script src="data/laws.js?v=1cf184e5"></script>
 <script src="data/sounds.js?v=3c6dcebe"></script>
-<script src="assets/app.js?v=4c6dbc3d"></script>
+<script src="assets/app.js?v=b13e8019"></script>
 <script src="assets/fx.js?v=4e1e879a"></script>
 <script src="assets/duel.js?v=2174ce98"></script>
 <!--/APP-->
