@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="build" content="aaf21d99">
+<meta name="build" content="ba821368">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>律刃</title>
 <meta name="application-name" content="律刃">
@@ -19,7 +19,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;700;900&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@700&amp;text=%E5%88%80%E6%B0%A3%E7%B8%B1%E6%A9%AB%E5%8F%83%E8%B2%B3%E5%A3%B9%E6%96%AC%E5%8B%9D%E6%95%97%E5%92%8C%E9%80%A30123456789-%2B&amp;display=swap">
-<link rel="stylesheet" href="assets/style.css?v=f6c25f51">
+<link rel="stylesheet" href="assets/style.css?v=99e08088">
 </head>
 <body>
 <!--APP-->
@@ -50,11 +50,12 @@
           <line x1="-20" y1="66" x2="120" y2="34"/>
         </svg>
       </h1>
-      <div class="seal" aria-hidden="true"><span>警</span><span>察</span><span>人</span><span>事</span></div>
+      <div class="seal" id="home-seal" aria-hidden="true"><span>警</span><span>察</span><span>人</span><span>事</span></div>
       <p class="cover-meta" id="home-sub"></p>
     </div>
 
     <div class="console">
+      <div class="seg law-pick" id="law-pick" role="radiogroup" aria-label="選擇法規" hidden></div>
       <div class="ledger">
         <p class="ledger-line">
           <span>已背 <b id="st-seen">0</b><small id="st-total">／52</small></span>
@@ -326,6 +327,10 @@
         <input id="duel-name" maxlength="12" autocomplete="nickname" placeholder="最多 12 字">
       </label>
       <div class="room-opts">
+        <div class="opt-row" id="room-law-row" hidden>
+          <span class="opt-label">法規</span>
+          <div class="seg" id="room-law" role="radiogroup" aria-label="法規"></div>
+        </div>
         <div class="opt-row">
           <span class="opt-label">模式</span>
           <div class="seg" id="room-mode" role="radiogroup" aria-label="對決模式">
@@ -379,11 +384,11 @@
   </div>
 </div>
 
-<script src="data/laws.js?v=b7f9f436"></script>
+<script src="data/laws.js?v=1cf184e5"></script>
 <script src="data/sounds.js?v=3c6dcebe"></script>
-<script src="assets/app.js?v=cf8c8b17"></script>
+<script src="assets/app.js?v=7e8fec8d"></script>
 <script src="assets/fx.js?v=4e1e879a"></script>
-<script src="assets/duel.js?v=25fa4417"></script>
+<script src="assets/duel.js?v=2174ce98"></script>
 <!--/APP-->
 </body>
 </html>

@@ -20,7 +20,8 @@ from titles import TITLES
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = [
-    {"id": "police-personnel", "file": ROOT / "data/source/police-personnel.txt"},
+    {"id": "police-personnel", "file": ROOT / "data/source/police-personnel.txt", "short": "人事條例", "seal": "警察人事"},
+    {"id": "police-powers", "file": ROOT / "data/source/police-powers.txt", "short": "職權行使法", "seal": "警察職權"},
 ]
 OUT = ROOT / "data/laws.js"
 SOUNDS_OUT = ROOT / "data/sounds.js"
@@ -174,6 +175,8 @@ def main():
             "id": src["id"],
             "name": meta.get("法規名稱", src["id"]),
             "date": meta.get("修正日期", ""),
+            "short": src.get("short", ""),
+            "seal": src.get("seal", ""),
             "articles": articles,
         })
     body = json.dumps(laws, ensure_ascii=False, separators=(",", ":"))

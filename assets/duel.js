@@ -245,7 +245,8 @@
 
   function modeText(cfg) {
     var mode = cfg.mode === 'cloze' ? '關鍵字填空（挖空' + ['', '少', '中', '多'][cfg.density] + '）' : '逐字背誦';
-    return '模式：' + mode;
+    var law = window.LAWS.filter(function (l) { return l.id === cfg.law; })[0];
+    return (law ? law.name + '・' : '') + '模式：' + mode;
   }
 
   function openLobby(code) {
@@ -316,8 +317,30 @@
       });
     });
     $('room-density-row').hidden = roomOpts.mode !== 'cloze';
+    // 法規跟著目前背的法規走；在這裡切換也會一起換掉練習中的法規
+    var laws = window.LAWS || [];
+    $('room-law-row').hidden = laws.length < 2;
+    var box = $('room-law');
+    if (box.children.length !== laws.length) {
+      box.textContent = '';
+      laws.forEach(function (l) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.setAttribute('role', 'radio');
+        b.dataset.law = l.id;
+        b.textContent = l.short || l.name;
+        box.appendChild(b);
+      });
+    }
+    Array.prototype.forEach.call(box.children, function (b) {
+      b.setAttribute('aria-checked', String(b.dataset.law === APP.law().id));
+    });
   }
   function bindRoomOpts() {
+    $('room-law').addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (b && APP.setLaw(b.dataset.law)) renderRoomOpts();
+    });
     [['room-mode', function (b) { roomOpts.mode = b.dataset.mode; }],
      ['room-density', function (b) { roomOpts.density = +b.dataset.d; }],
      ['room-len', function (b) { roomOpts.len = b.dataset.len; }]].forEach(function (g) {
@@ -421,7 +444,8 @@
       if (!room) throw { code: 'nf' };
       if (room.host === uid) throw { code: 'self' };
       if (room.p && room.p.g) throw { code: 'full' };
-      if (room.cfg.law !== APP.law().id) throw { code: 'law' };
+      // 房主背的是另一部法規 → 自動切過去
+      if (room.cfg.law !== APP.law().id && !APP.setLaw(room.cfg.law)) throw { code: 'law' };
       G = blankGame();
       G.code = code;
       G.slot = 'g';
@@ -449,7 +473,7 @@
       if (c === 'nf') msg('找不到這個房間，請確認房號');
       else if (c === 'self') msg('這是你自己建立的房間，請讓朋友輸入房號');
       else if (c === 'full') msg('這個房間已經滿了');
-      else if (c === 'law') msg('對方背的是另一部法規');
+      else if (c === 'law') msg('對方背的法規這個版本沒有，請重新整理網頁');
       else fail(err);
     });
   }
@@ -657,6 +681,7 @@
       // 房間沒了、對手已離開或已判勝、座位被別人坐走 → 這場已經結束
       if (!room || !room.startAt || !opp || opp.q || (mine && mine.uid !== uid)) throw { code: 'gone' };
       if (Date.now() - rec.at >= SELF_GRACE_MS) throw { code: 'late' };
+      if (room.cfg.law !== APP.law().id && !APP.setLaw(room.cfg.law)) throw { code: 'gone' };
       G = blankGame();
       G.code = rec.code;
       G.slot = rec.slot;

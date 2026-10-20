@@ -1001,12 +1001,10 @@
     $('v-mic').addEventListener('click', function () { if (V.on) voiceStop(); else voiceStart(); });
     $('v-hint').addEventListener('click', hint);
     $('v-back').addEventListener('click', back);
-    $('law-select').addEventListener('change', function (e) {
-      law = LAWS[+e.target.value];
-      prefs.law = law.id;
-      artIdx = artIndexById(prefs.art[law.id]);
-      showLaw();
-      startArticle();
+    $('law-select').addEventListener('change', function (e) { setLaw(LAWS[+e.target.value].id); });
+    $('law-pick').addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (b) setLaw(b.dataset.law);
     });
 
     document.addEventListener('keydown', function (e) {
@@ -1150,6 +1148,8 @@
     $('home-review').classList.toggle('has-due', due > 0);
     $('home-review-desc').textContent = due ? '今天有 ' + due + ' 條到期・背完才算數' : '錯過的條文，隔 1、3、7 天再審';
     $('home-law').textContent = law.name;
+    var seal = (law.seal || '警察人事').split('');
+    Array.prototype.forEach.call($('home-seal').children, function (sp, i) { sp.textContent = seal[i] || ''; });
     var d = /(\d+)\D+(\d+)\D+(\d+)/.exec(law.date || '');
     $('home-sub').textContent = (d ? '民國 ' + (+d[1]) + '.' + (+d[2]) + '.' + (+d[3]) + ' 修正・' : '') + '凡 ' + law.articles.length + ' 條';
     var art = law.articles[artIdx];
@@ -1167,7 +1167,28 @@
     updateKbHeight();
   }
 
+  // 換法規：各法規的進度、複習、上次背到哪一條都分開記
+  function setLaw(id) {
+    var next = LAWS.filter(function (l) { return l.id === id; })[0];
+    if (!next || next === law) return !!next;
+    if (R) endReview();
+    law = next;
+    prefs.law = law.id;
+    savePrefs();
+    artIdx = artIndexById(prefs.art[law.id]);
+    showLaw();
+    startArticle();
+    if (document.body.classList.contains('on-home')) renderHome();
+    return true;
+  }
+
   function showLaw() {
+    if (LAWS.length > 1) {
+      $('law-select').value = LAWS.indexOf(law);
+      Array.prototype.forEach.call($('law-pick').children, function (b) {
+        b.setAttribute('aria-checked', String(b.dataset.law === law.id));
+      });
+    }
     $('law-name').textContent = law.name;
     $('law-date').textContent = law.date ? '・' + law.date.replace(/^民國\s*/, '民國') + '修正' : '';
     document.title = '律刃｜' + law.name;
@@ -1186,6 +1207,15 @@
       });
       ls.value = LAWS.indexOf(law);
       ls.hidden = false;
+      LAWS.forEach(function (l) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.setAttribute('role', 'radio');
+        b.dataset.law = l.id;
+        b.textContent = l.short || l.name;
+        $('law-pick').appendChild(b);
+      });
+      $('law-pick').hidden = false;
     }
     applyTheme();
     applyFont();
@@ -1257,6 +1287,7 @@
     duelBegin: duelBegin,
     duelEnd: duelEnd,
     duelSnapshot: duelSnapshot,
+    setLaw: setLaw,
     inDuel: function () { return !!DUEL; },
     showHome: showHome,
     showToast: showToast
