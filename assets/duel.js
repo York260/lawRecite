@@ -834,6 +834,11 @@
     setAva($('opp-ava'), G.opp.name);
     note('');
     $('duel-hud').hidden = false;
+    // 武士模式：上方改成潑墨武士對砍（減少動態效果時不開）
+    G.samurai = !!(APP.prefs.samurai && window.Samurai && !FX.reduced());
+    $('duel-hud').classList.toggle('samurai', G.samurai);
+    document.body.classList.toggle('samurai-duel', G.samurai);
+    if (G.samurai) window.Samurai.start($('duel-hud'));
     renderCombo(0);
     renderHud();
     APP.duelBegin({
@@ -996,14 +1001,19 @@
     $('duel-note').hidden = true;
     var ko = (result === 'win' && oppHp() <= 0) || (result === 'lose' && myHp() <= 0);
     var g = G;
-    // 擊倒時先來一記終結一刀，再進結算
-    if (ko) {
-      FX.finisher(result === 'win' ? FX.palette().ink : FX.palette().seal);
-      FX.shake(document.querySelector('.wrap'), 12);
-      FX.shake($('duel-hud'), 8);
+    if (ko && g.samurai) {
+      // 武士模式的擊敗演出（蓄・展・靜・閃・過・裂，約 5.7 秒），演完才進結算；震動只在收刀那一下
+      window.Samurai.knockout(result === 'win' ? 'me' : 'opp', function () { showResult(g, result, text); });
+    } else {
+      // 擊倒時先來一記終結一刀，再進結算
+      if (ko) {
+        FX.finisher(result === 'win' ? FX.palette().ink : FX.palette().seal);
+        FX.shake(document.querySelector('.wrap'), 12);
+        FX.shake($('duel-hud'), 8);
+      }
+      setTimeout(function () { showResult(g, result, text); }, ko ? 900 : 200);
+      if (navigator.vibrate) { try { navigator.vibrate(result === 'win' ? [30, 40, 30, 40, 80] : 160); } catch (e) { /* 不支援 */ } }
     }
-    setTimeout(function () { showResult(g, result, text); }, ko ? 900 : 200);
-    if (navigator.vibrate) { try { navigator.vibrate(result === 'win' ? [30, 40, 30, 40, 80] : 160); } catch (e) { /* 不支援 */ } }
     // 等最後的數字送完，再給對方一點時間讀取，然後清掉房間
     var steps = Math.max(Math.ceil((g.me.d - g.sent.d) / MAX_D_STEP), Math.ceil((g.me.n - g.sent.n) / MAX_N_STEP), 0);
     setTimeout(function () {
@@ -1059,6 +1069,9 @@
       releaseRoom(G, G.phase === 'play' || G.phase === 'count');
       setTimeout(disconnect, 500);
     }
+    if (G.samurai && window.Samurai) window.Samurai.stop();
+    $('duel-hud').classList.remove('samurai');
+    document.body.classList.remove('samurai-duel');
     G = null;
     $('duel-hud').hidden = true;
     $('duel-stage').hidden = true;
@@ -1081,7 +1094,9 @@
   }
 
   // 刀芒從我方血條出發，往下劃一道弧，砍進對方血條
+  function samurai() { return !!(G && G.samurai); }
   function outgoing(count, streak, dmg, red) {
+    if (samurai()) { window.Samurai.attack('me', red, dmg, streak); return; }
     var from = center(document.querySelector('.fighter.me .hp-bar'));
     var to = center(document.querySelector('.fighter.opp .hp-bar'));
     var pal = FX.palette();
@@ -1110,6 +1125,7 @@
 
   // 對手整條全對放出刀氣縱橫：朱紅筆鋒劈過我方畫面
   function stormIn(dd) {
+    if (samurai()) { window.Samurai.special('opp'); APP.pauseInput(3100); return; }
     var pal = FX.palette();
     FX.storm({ color: pal.seal, scale: 0.9 });
     FX.shake(document.querySelector('.wrap'), 9);
@@ -1119,6 +1135,7 @@
   }
 
   function incoming(dd) {
+    if (samurai()) { window.Samurai.attack('opp', false, dd, 0); return; }
     var pal = FX.palette();
     // 大約一字一道，最多 3 道
     var count = Math.min(3, Math.max(1, Math.round(dd / Math.max(1, G.base))));
@@ -1145,6 +1162,7 @@
   // 刀氣縱橫：整條全對時觸發。四道筆鋒縱橫劈過全畫面，中央蓋上四字與「斬」印
   var stormBusy = false;
   function qiStorm(artId, bonus) {
+    if (samurai()) { window.Samurai.special('me'); APP.pauseInput(3100); return; }
     FX.storm({ scale: 1.15 });
     FX.shake(document.querySelector('.wrap'), 12);
     FX.shake($('duel-hud'), 9);

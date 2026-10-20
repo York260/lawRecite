@@ -30,6 +30,8 @@
   --font-ui: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
   --font-law: "Noto Serif TC", "Songti TC", "PMingLiU", "MingLiU", serif;
   --kb-h: 0px;
+  /* 武士模式畫布 */
+  --sam-paper: #eef0f4; --sam-mist: #c3cad6; --sam-me: #111a2e; --sam-foe: #b42318; --sam-steel: #f4f6fa;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -39,6 +41,7 @@
     --kb-bg: #070b14; --key: #232c42; --key-m: #22305a; --key-f: #3a3424; --key-shadow: #03050a;
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
     --blade-ink: #050608; --blade-rim: rgba(226, 214, 184, .95);
+    --sam-paper: #0f1626; --sam-mist: #2a3550; --sam-me: #e6ebf5; --sam-foe: #e5534b; --sam-steel: #ffffff;
     color-scheme: dark;
   }
 }
@@ -50,6 +53,7 @@
   --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
   --blade-ink: #050608; --blade-rim: rgba(226, 214, 184, .95);
   color-scheme: dark;
+  --sam-paper: #0f1626; --sam-mist: #2a3550; --sam-me: #e6ebf5; --sam-foe: #e5534b; --sam-steel: #ffffff;
 }
 
 * { box-sizing: border-box; }
@@ -923,3 +927,28 @@ body.on-home { padding-bottom: 28px; }
 .resume-left { margin: 0 0 14px; color: var(--muted); }
 .resume-left b { color: var(--seal); font-size: 1.25em; font-variant-numeric: tabular-nums; }
 #duel-resume .link-btn { display: block; margin: 14px auto 0; color: var(--muted); }
+
+/* ---------- 武士模式 ---------- */
+.duel-hud.samurai {
+  height: calc(env(safe-area-inset-top, 0px) + 156px); align-items: start; overflow: hidden;
+  background: var(--sam-paper); -webkit-backdrop-filter: none; backdrop-filter: none;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 6px);
+}
+.duel-hud.samurai .samurai-cv { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; display: block; }
+.duel-hud.samurai .f-ava { display: none; }
+.duel-hud.samurai .fighter, .duel-hud.samurai .hud-mid, .duel-hud.samurai .hud-note { transition: opacity .3s; }
+.duel-hud.samurai .hud-note {
+  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); max-width: 90%;
+  padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 85%, transparent);
+}
+.duel-hud.samurai.cine .fighter, .duel-hud.samurai.cine .hud-mid, .duel-hud.samurai.cine .hud-note { opacity: 0; pointer-events: none; }
+.duel-hud.samurai.full { z-index: 40; border-bottom: 0; transition: height .8s cubic-bezier(.65, 0, .35, 1); }
+body.in-duel.samurai-duel .wrap { padding-top: calc(env(safe-area-inset-top, 0px) + 166px); }
+/* 大招演出時暫停輸入 */
+.sheet { position: relative; }
+body.input-paused .sheet::after {
+  content: '大招演出中・輸入暫停'; position: absolute; inset: 0; z-index: 3; display: grid; place-items: center;
+  border-radius: inherit; background: color-mix(in srgb, var(--surface) 72%, transparent);
+  font: 700 14px/1 var(--font-ui); letter-spacing: .12em; color: var(--muted);
+}
+body.input-paused .kb-keys { opacity: .45; }

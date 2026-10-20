@@ -80,6 +80,7 @@
     layout: 'dachen',
     keySize: coarse ? 'l' : 'm',
     vibrate: true,
+    samurai: false,    // 武士模式：對決畫面上方改成潑墨武士對砍
     theme: 'auto',
     fontScale: 1,
     peek: false,       // 「原文」：空格裡淡淡顯示原字，給初學者照著打
@@ -314,8 +315,18 @@
   }
 
   // ---------- 輸入 ----------
+  // 大招演出時暫停輸入（雙方都看得到刀氣縱橫，所以兩邊都停一下）
+  var pausedUntil = 0, pauseTimer = 0;
+  function inputPaused() { return Date.now() < pausedUntil; }
+  function pauseInput(ms) {
+    pausedUntil = Math.max(pausedUntil, Date.now() + ms);
+    document.body.classList.add('input-paused');
+    clearTimeout(pauseTimer);
+    pauseTimer = setTimeout(function () { document.body.classList.remove('input-paused'); }, pausedUntil - Date.now());
+  }
+
   function input(sym) {
-    if (!S || S.done) return;
+    if (!S || S.done || inputPaused()) return;
     voiceFlush(false);
     var cell = S.cells[S.order[S.pos]];
     if (cell.z.indexOf(sym) !== -1) {
@@ -334,7 +345,7 @@
   }
 
   function hint() {
-    if (!S || S.done) return;
+    if (!S || S.done || inputPaused()) return;
     voiceFlush(false);
     S.cells[S.order[S.pos]].st = 'hint';
     advance();
@@ -349,7 +360,7 @@
   }
 
   function back() {
-    if (!S) return;
+    if (!S || inputPaused()) return;
     voiceFlush(false);
     if (S.missed) { S.missed = false; paint(); return; }
     if (S.pos === 0) return;
@@ -779,6 +790,7 @@
     $('opt-retry').checked = prefs.retry;
     $('opt-kb').checked = prefs.kb;
     $('opt-vibrate').checked = prefs.vibrate;
+    $('opt-samurai').checked = !!prefs.samurai;
     var voice = prefs.input === 'voice';
     $('retry-wrap').hidden = voice;
     $('kb-wrap').hidden = voice;
@@ -1021,6 +1033,7 @@
       syncControls();
     });
     $('opt-vibrate').addEventListener('change', function (e) { prefs.vibrate = e.target.checked; savePrefs(); });
+    $('opt-samurai').addEventListener('change', function (e) { prefs.samurai = e.target.checked; savePrefs(); e.target.blur(); });
     $('v-mic').addEventListener('click', function () { if (V.on) voiceStop(); else voiceStart(); });
     $('v-hint').addEventListener('click', hint);
     $('v-back').addEventListener('click', back);
@@ -1085,6 +1098,7 @@
     var t = prefs.theme === 'light' || prefs.theme === 'dark' ? prefs.theme : hostTheme;
     if (t) root.setAttribute('data-theme', t); else root.removeAttribute('data-theme');
     var dark = isDark();
+    if (window.Samurai) window.Samurai.theme();
     Array.prototype.forEach.call(document.querySelectorAll('.theme-btn'), function (btn) {
       btn.classList.toggle('is-dark', dark);
       btn.setAttribute('aria-label', dark ? '切換成白天模式' : '切換成黑夜模式');
@@ -1380,6 +1394,7 @@
     duelEnd: duelEnd,
     duelSnapshot: duelSnapshot,
     setLaw: setLaw,
+    pauseInput: pauseInput,
     inDuel: function () { return !!DUEL; },
     showHome: showHome,
     showToast: showToast
