@@ -749,11 +749,36 @@ body.on-home { padding-bottom: 28px; }
 .cover-law {
   grid-column: 1; grid-row: 1;
   margin: 6px 0 0;
-  writing-mode: vertical-rl;
-  display: flex; gap: 10px;
-  font: 700 18px/1.2 var(--font-law); letter-spacing: .32em;
-  color: var(--ink);
+  display: flex; flex-direction: row-reverse; align-items: flex-start; gap: 4px;
 }
+/* 題簽：直排法規名。選中的是濃墨，左緣一道黃銅細線，下垂朱紅書籤帶；其餘淡墨 */
+.spine {
+  position: relative;
+  writing-mode: vertical-rl;
+  margin: 0; padding: 2px 6px 0;
+  border: 0; background: none; cursor: pointer;
+  font: 500 15px/1.2 var(--font-law); letter-spacing: .32em;
+  color: var(--muted); opacity: .62;
+  transition: color .25s, opacity .25s, font-size .25s;
+  -webkit-tap-highlight-color: transparent;
+}
+.spine:hover, .spine:focus-visible { opacity: 1; color: var(--ink); outline: none; }
+.spine:disabled { cursor: default; }
+.spine[aria-checked="true"] { font-size: 18px; font-weight: 700; color: var(--ink); opacity: 1; }
+.spine::before {
+  content: ''; position: absolute; left: 0; top: 4px; bottom: 6px; width: 1.5px;
+  background: var(--brass); transform: scaleY(0); transform-origin: top;
+  transition: transform .45s cubic-bezier(.7, 0, .2, 1);
+}
+.spine::after {
+  content: ''; position: absolute; left: 50%; bottom: -19px; width: 8px; height: 16px;
+  margin-left: -4px; background: var(--seal);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+  transform: scaleY(0); transform-origin: top;
+  transition: transform .35s cubic-bezier(.2, .8, .3, 1) .15s;
+}
+.spine[aria-checked="true"]::before, .spine[aria-checked="true"]::after { transform: none; }
+.spine:disabled::before, .spine:disabled::after { display: none; }
 .cover-meta {
   grid-column: 1 / -1; grid-row: 3;
   margin: 14px 0 0; text-align: center;
@@ -777,7 +802,6 @@ body.on-home { padding-bottom: 28px; }
 .seal span:nth-child(4) { grid-column: 1; grid-row: 2; }
 
 .console { display: grid; gap: 14px; align-content: start; }
-.law-pick { justify-self: start; }
 
 /* 戰績：一行帳目＋52 條刻度 */
 .ledger { display: grid; gap: 8px; }

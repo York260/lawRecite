@@ -1002,7 +1002,7 @@
     $('v-hint').addEventListener('click', hint);
     $('v-back').addEventListener('click', back);
     $('law-select').addEventListener('change', function (e) { setLaw(LAWS[+e.target.value].id); });
-    $('law-pick').addEventListener('click', function (e) {
+    $('home-law').addEventListener('click', function (e) {
       var b = e.target.closest('button');
       if (b) setLaw(b.dataset.law);
     });
@@ -1119,6 +1119,27 @@
     } else if (where === 'settings') openSettings();
     // duel 由 duel.js 處理
   }
+  // 書封左側的直排題簽：每部法規一條，目前的是墨色並垂一條朱紅書籤帶，點別條就換法規
+  function renderSpines() {
+    var box = $('home-law');
+    if (box.children.length !== LAWS.length) {
+      box.textContent = '';
+      LAWS.forEach(function (l) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'spine';
+        b.setAttribute('role', 'radio');
+        b.dataset.law = l.id;
+        b.textContent = l.name;
+        if (LAWS.length < 2) b.disabled = true;
+        box.appendChild(b);
+      });
+    }
+    Array.prototype.forEach.call(box.children, function (b) {
+      b.setAttribute('aria-checked', String(b.dataset.law === law.id));
+    });
+  }
+
   function renderHome() {
     var keys = Object.keys(store.progress), prefix = law.id + ':';
     var seen = 0, perfect = 0, ticks = $('ticks');
@@ -1147,7 +1168,7 @@
     $('home-due').hidden = !due;
     $('home-review').classList.toggle('has-due', due > 0);
     $('home-review-desc').textContent = due ? '今天有 ' + due + ' 條到期・背完才算數' : '錯過的條文，隔 1、3、7 天再審';
-    $('home-law').textContent = law.name;
+    renderSpines();
     var seal = (law.seal || '警察人事').split('');
     Array.prototype.forEach.call($('home-seal').children, function (sp, i) { sp.textContent = seal[i] || ''; });
     var d = /(\d+)\D+(\d+)\D+(\d+)/.exec(law.date || '');
@@ -1178,16 +1199,24 @@
     artIdx = artIndexById(prefs.art[law.id]);
     showLaw();
     startArticle();
-    if (document.body.classList.contains('on-home')) renderHome();
+    if (document.body.classList.contains('on-home')) {
+      renderHome();
+      // 換法規時重新鈐一次印
+      var seal = $('home-seal');
+      if (seal.animate && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+        seal.animate([
+          { transform: 'rotate(-4deg) scale(1.6)', opacity: 0 },
+          { transform: 'rotate(-4deg) scale(.94)', opacity: 1, offset: 0.7 },
+          { transform: 'rotate(-4deg) scale(1)', opacity: 1 }
+        ], { duration: 320, easing: 'cubic-bezier(.2,.8,.3,1)' });
+      }
+    }
     return true;
   }
 
   function showLaw() {
     if (LAWS.length > 1) {
       $('law-select').value = LAWS.indexOf(law);
-      Array.prototype.forEach.call($('law-pick').children, function (b) {
-        b.setAttribute('aria-checked', String(b.dataset.law === law.id));
-      });
     }
     $('law-name').textContent = law.name;
     $('law-date').textContent = law.date ? '・' + law.date.replace(/^民國\s*/, '民國') + '修正' : '';
@@ -1207,15 +1236,6 @@
       });
       ls.value = LAWS.indexOf(law);
       ls.hidden = false;
-      LAWS.forEach(function (l) {
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.setAttribute('role', 'radio');
-        b.dataset.law = l.id;
-        b.textContent = l.short || l.name;
-        $('law-pick').appendChild(b);
-      });
-      $('law-pick').hidden = false;
     }
     applyTheme();
     applyFont();
